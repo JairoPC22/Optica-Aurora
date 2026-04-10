@@ -1988,7 +1988,14 @@ html:has(body.dark) {
     #131f2e var(--sidebar-w)
   );
 }
-
+@media (max-width: 768px) {
+  html {
+    background: var(--gris-claro);
+  }
+  html:has(body.dark) {
+    background: #131f2e;
+  }
+}
 
 /* ── FIX SCROLL PWA iOS ── */
 @media (display-mode: standalone) {
