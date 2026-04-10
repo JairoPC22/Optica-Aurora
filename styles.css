@@ -55,7 +55,7 @@ html {
 
 body {
   font-family: var(--font-main);
-  background: var(--gris-claro);
+  background: transparent;
   color: var(--azul-oscuro);
   min-height: 100dvh;
   overflow-x: hidden;
