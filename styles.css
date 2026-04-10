@@ -1966,6 +1966,10 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
 body.dark .topbar::before { background: #1e2d3d; }
 body.sidebar-collapsed .topbar { left: 68px; }
 /* ── FIX SCROLL PWA iOS ── */
+html {
+  background: var(--gris-claro);
+}
+
 html, body {
   position: fixed;
   width: 100%;
@@ -1982,12 +1986,6 @@ html, body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   height: 100%;
-  padding-bottom: env(safe-area-inset-bottom, 20px);
-  box-shadow: 0 env(safe-area-inset-bottom, 20px) 0 env(safe-area-inset-bottom, 20px) var(--gris-claro);
-}
-
-body.dark .main-content {
-  box-shadow: 0 env(safe-area-inset-bottom, 20px) 0 env(safe-area-inset-bottom, 20px) #131f2e;
 }
 
 .sidebar {
@@ -1995,10 +1993,4 @@ body.dark .main-content {
   -webkit-overflow-scrolling: touch;
   height: 100%;
   min-height: unset;
-  padding-bottom: env(safe-area-inset-bottom, 20px);
-  box-shadow: 0 env(safe-area-inset-bottom, 20px) 0 env(safe-area-inset-bottom, 20px) var(--azul-oscuro);
-}
-
-body.dark .sidebar {
-  box-shadow: 0 env(safe-area-inset-bottom, 20px) 0 env(safe-area-inset-bottom, 20px) #0d1826;
 }
