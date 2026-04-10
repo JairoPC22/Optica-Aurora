@@ -2591,9 +2591,11 @@ function navigateTo(seccion) {
   if (seccion === 'inventario') filterInventario();
   if (seccion === 'auditoria')  filterAuditoria();
 
-  // En móvil, cerrar sidebar
+// En móvil, cerrar sidebar y quitar overlay
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
+    const overlay = document.getElementById('sidebar-mobile-overlay');
+    if (overlay) overlay.remove();
   }
 
   feather.replace();
