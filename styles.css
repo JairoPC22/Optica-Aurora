@@ -84,7 +84,9 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
    🔐 LOGIN SCREEN
 ============================================================ */
 .login-screen {
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1983,11 +1985,11 @@ html:has(body.dark) {
 }
 
 /* Login screen — fondo completo azul oscuro */
-html:has(#login-screen:not(.hidden)) {
-  background: var(--azul-oscuro);
-}
-html:has(body.dark):has(#login-screen:not(.hidden)) {
-  background: #0d1826;
+html:has(#login-screen:not(.hidden)),
+html:has(#login-screen:not(.hidden)) body {
+  background: linear-gradient(135deg, var(--azul-oscuro) 0%, var(--azul-medio) 60%, #1a4a6e 100%);
+  height: 100dvh;
+  overflow: hidden;
 }
 
 /* ── FIX SCROLL PWA iOS ── */
