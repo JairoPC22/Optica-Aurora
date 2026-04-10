@@ -89,15 +89,14 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
    🔐 LOGIN SCREEN
 ============================================================ */
 .login-screen {
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--azul-oscuro) 0%, var(--azul-medio) 60%, #1a4a6e 100%);
-  position: relative;
   overflow: hidden;
+  z-index: 9999;
 }
 
 /* Formas decorativas de fondo */
@@ -2007,6 +2006,10 @@ html:has(body.dark) {
     -webkit-overflow-scrolling: touch;
     height: 100%;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--gris-claro);
+  }
+  body.dark .main-content {
+    background: #131f2e;
   }
   .sidebar {
     overflow-y: auto;
