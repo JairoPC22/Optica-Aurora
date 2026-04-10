@@ -57,7 +57,7 @@ body {
   font-family: var(--font-main);
   background: transparent;
   color: var(--azul-oscuro);
-  min-height: 100%;
+  min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
