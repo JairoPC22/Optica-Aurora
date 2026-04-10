@@ -1965,12 +1965,35 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
 
 body.dark .topbar::before { background: #1e2d3d; }
 body.sidebar-collapsed .topbar { left: 68px; }
+/* ── FONDO BASE — tapa la franja inferior en navegador y PWA ── */
+html {
+  background: var(--gris-claro);
+}
+
+body.dark ~ html,
+html:has(body.dark) {
+  background: #131f2e;
+}
+
+/* Cubre la franja inferior del lado del sidebar con azul */
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  height: 40px;
+  background: var(--azul-oscuro);
+  z-index: 99;
+  pointer-events: none;
+}
+
+body.dark::after {
+  background: #0d1826;
+}
+
 /* ── FIX SCROLL PWA iOS — solo cuando está anclada como app ── */
 @media (display-mode: standalone) {
-  html {
-    background: var(--gris-claro);
-  }
-
   html, body {
     position: fixed;
     width: 100%;
@@ -1987,19 +2010,16 @@ body.sidebar-collapsed .topbar { left: 68px; }
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     height: 100%;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .sidebar {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    height: 100%;
     min-height: unset;
-    /* Extiende el fondo azul hasta el borde real de pantalla */
-    padding-bottom: env(safe-area-inset-bottom, 20px);
-    background-color: var(--azul-oscuro);
   }
-  
-  body.dark .sidebar {
-    background-color: #0d1826;
+
+  body::after {
+    height: env(safe-area-inset-bottom, 40px);
   }
 }
