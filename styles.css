@@ -1967,8 +1967,20 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
 body.dark .topbar::before { background: #1e2d3d; }
 body.sidebar-collapsed .topbar { left: 68px; }
 /* ── FONDO BASE html ── */
-html { background: var(--gris-claro); }
-html:has(body.dark) { background: #131f2e; }
+html {
+  background: linear-gradient(
+    to right,
+    var(--azul-oscuro) var(--sidebar-w),
+    var(--gris-claro) var(--sidebar-w)
+  );
+}
+html:has(body.dark) {
+  background: linear-gradient(
+    to right,
+    #0d1826 var(--sidebar-w),
+    #131f2e var(--sidebar-w)
+  );
+}
 
 /* ── FIX SCROLL PWA iOS ── */
 @media (display-mode: standalone) {
