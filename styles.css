@@ -428,7 +428,6 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   display: flex;
   flex-direction: column;
   transition: margin-left var(--transition);
-  /* Compensar la altura del topbar fijo */
   padding-top: calc(var(--topbar-h) + env(safe-area-inset-top, 0));
 }
 .main-content.expanded { margin-left: 68px; }
@@ -436,24 +435,19 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 
 /* ── TOPBAR ── */
 .topbar {
-  height: var(--topbar-h);
   background: var(--blanco);
   border-bottom: 1px solid var(--gris-borde);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.6rem;
-  /* Fixed en lugar de sticky — fix definitivo para iOS PWA */
+  padding-top: env(safe-area-inset-top, 0);
   position: fixed;
   top: 0;
-  /* En iOS con notch, respetar el safe area */
-  top: env(safe-area-inset-top, 0);
-  padding-top: env(safe-area-inset-top, 0);
   left: var(--sidebar-w);
   right: 0;
   z-index: 50;
   box-shadow: var(--shadow-sm);
-  /* Altura total incluyendo safe area */
   height: calc(var(--topbar-h) + env(safe-area-inset-top, 0));
 }
 .topbar-left { display: flex; align-items: center; gap: .8rem; }
