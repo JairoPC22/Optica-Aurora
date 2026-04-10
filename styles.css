@@ -1965,7 +1965,7 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
 
 body.dark .topbar::before { background: #1e2d3d; }
 body.sidebar-collapsed .topbar { left: 68px; }
-/* ── FIX SCROLL PWA iOS — evita que el fondo se mueva ── */
+/* ── FIX SCROLL PWA iOS ── */
 html, body {
   position: fixed;
   width: 100%;
@@ -1981,12 +1981,12 @@ html, body {
 .main-content {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  height: 100%;
+  height: calc(100% + env(safe-area-inset-bottom, 20px));
 }
 
 .sidebar {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  height: 100%;
+  height: calc(100% + env(safe-area-inset-bottom, 20px));
   min-height: unset;
 }
