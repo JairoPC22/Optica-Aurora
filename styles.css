@@ -259,6 +259,8 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   z-index: 100;
   transition: width var(--transition), transform var(--transition);
   overflow: hidden;
+  /* Safe area para el sidebar en PWA */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .sidebar.collapsed {
@@ -289,6 +291,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   justify-content: space-between;
   padding: 1.2rem 1rem 1rem;
   border-bottom: 1px solid rgba(255,255,255,.06);
+  /* En PWA el padding-top ya viene del .sidebar */
 }
 
 .sidebar-logo {
@@ -443,7 +446,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   padding-left: 1.6rem;
   padding-right: 1.6rem;
   padding-bottom: 0;
-  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+  padding-top: env(safe-area-inset-top, 0px);
   position: fixed;
   top: 0;
   left: var(--sidebar-w);
@@ -451,6 +454,20 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   z-index: 50;
   box-shadow: var(--shadow-sm);
   height: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+  /* Fondo que cubre el área del notch */
+  background-clip: padding-box;
+}
+
+/* Pseudo-elemento que cubre el área del notch con el mismo color */
+.topbar::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--blanco);
+  z-index: 51;
 }
 .topbar-left { display: flex; align-items: center; gap: .8rem; }
 .topbar-right { display: flex; align-items: center; gap: 1.2rem; }
@@ -1925,8 +1942,14 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
       padding-top: env(safe-area-inset-top);
       height: calc(var(--topbar-h) + env(safe-area-inset-top));
     }
+    .topbar::before {
+      height: env(safe-area-inset-top);
+    }
     .main-content {
       padding-top: calc(var(--topbar-h) + env(safe-area-inset-top));
+    }
+    .sidebar {
+      padding-top: env(safe-area-inset-top);
     }
   }
 }
