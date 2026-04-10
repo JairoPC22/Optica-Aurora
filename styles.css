@@ -1982,6 +1982,14 @@ html:has(body.dark) {
   );
 }
 
+/* Login screen — fondo completo azul oscuro */
+html:has(#login-screen:not(.hidden)) {
+  background: var(--azul-oscuro);
+}
+html:has(body.dark):has(#login-screen:not(.hidden)) {
+  background: #0d1826;
+}
+
 /* ── FIX SCROLL PWA iOS ── */
 @media (display-mode: standalone) {
   html, body {
