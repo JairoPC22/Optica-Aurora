@@ -261,6 +261,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   overflow: hidden;
   /* Safe area para el sidebar en PWA */
   padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .sidebar.collapsed {
@@ -1966,15 +1967,10 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
 body.dark .topbar::before { background: #1e2d3d; }
 body.sidebar-collapsed .topbar { left: 68px; }
 /* ── FONDO BASE html ── */
-html {
-  background: var(--gris-claro);
-}
+html { background: var(--gris-claro); }
+html:has(body.dark) { background: #131f2e; }
 
-html:has(body.dark) {
-  background: #131f2e;
-}
-
-/* ── FIX SCROLL PWA iOS — solo cuando está anclada como app ── */
+/* ── FIX SCROLL PWA iOS ── */
 @media (display-mode: standalone) {
   html, body {
     position: fixed;
@@ -1982,19 +1978,16 @@ html:has(body.dark) {
     height: 100%;
     overflow: hidden;
   }
-
   .app {
     height: 100%;
     overflow: hidden;
   }
-
   .main-content {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     height: 100%;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-
   .sidebar {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
