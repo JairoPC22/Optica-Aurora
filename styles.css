@@ -1965,3 +1965,21 @@ body.dark .diagnostico-text { background: #131f2e; border-color: #2a3f55; color:
 
 body.dark .topbar::before { background: #1e2d3d; }
 body.sidebar-collapsed .topbar { left: 68px; }
+/* ── FIX SCROLL PWA iOS — evita que el fondo se mueva ── */
+html, body {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.main-content {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: 100vh;
+}
+
+.sidebar {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
