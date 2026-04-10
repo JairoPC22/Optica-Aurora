@@ -735,7 +735,7 @@ async function saveCliente() {
       showToast('Cliente actualizado correctamente', 'success');
     } else {
       const res = await apiPost(CONFIG.HOJAS.CLIENTES, 'create', data);
-      data.id = res.id || Date.now().toString();
+      data.id = res.id || data.id || Date.now().toString();
       STATE.clientes.push(data);
       await registrarAuditoria('Crear', `${STATE.usuario.nombre} creó al cliente ${nombre}`);
       showToast('Cliente creado correctamente', 'success');
@@ -1077,7 +1077,7 @@ async function saveHistorial() {
       showToast('Historial actualizado', 'success');
     } else {
       const res = await apiPost(CONFIG.HOJAS.HISTORIAL, 'create', data);
-      data.id = res.id || Date.now().toString();
+      data.id = res.id || data.id || Date.now().toString();
       STATE.historial.push(data);
       await registrarAuditoria('Crear', `${STATE.usuario.nombre} registró historial clínico de ${cliente?.nombre}`);
       showToast('Historial clínico guardado', 'success');
@@ -1344,7 +1344,12 @@ function calcularTotal() {
 }
 
 function calcularRestante() {
-  const total    = parseMoney(val('venta-total'));
+  const totalStr = val('venta-total');
+  if (!totalStr || totalStr.trim() === '') {
+    document.getElementById('venta-restante').value = '';
+    return;
+  }
+  const total    = parseMoney(totalStr);
   const anticipo = parseFloat(val('venta-anticipo')) || 0;
   const ventaId  = val('venta-id');
   const inputAnticipo = document.getElementById('venta-anticipo');
@@ -2281,7 +2286,7 @@ async function sendRecordatorio() {
       saldo:        formatMoney(saldo),
       ultimo_pago:  ultimoPago ? `${formatMoney(ultimoPago.monto)} el ${ultimoPago.fecha}` : 'Sin pagos previos',
       mensaje:      `Hola ${c.nombre.split(' ')[0]}, te recordamos que tienes un saldo pendiente de ${formatMoney(saldo)} en Óptica Aurora. ¡Estamos aquí para ayudarte!`,
-      contacto:     'WhatsApp: (228) 000-0000',
+      contacto:     'WhatsApp: (282) 129-2915',
     });
     await registrarAuditoria('Pago', `${STATE.usuario.nombre} envió recordatorio de pago a ${c.nombre}`);
     setEmailStatus('✓ Recordatorio enviado correctamente', 'success');
@@ -2320,7 +2325,7 @@ async function sendCorreoAgradecimiento(cliente, totalVenta) {
     to_email: cliente.email,
     total:    formatMoney(totalVenta),
     mensaje:  `¡Gracias ${cliente.nombre.split(' ')[0]}! Tu pago ha sido recibido y tu cuenta está al corriente. Si tienes dudas o necesitas facturación, contáctanos.`,
-    contacto: 'Óptica Aurora — Tel: (228) 000-0000',
+    contacto: 'Óptica Aurora — Tel: (282) 129-2915',
   });
   await registrarAuditoria('Pago', `Correo de agradecimiento enviado a ${cliente.nombre}`);
   showToast(`Correo de agradecimiento enviado a ${cliente.nombre}`, 'success');
@@ -2516,12 +2521,8 @@ function agregarBuscadorCliente(selectId) {
   const select = document.getElementById(selectId);
   if (!select) return;
 
-  const existente = document.getElementById('buscar-' + selectId);
-  if (existente) {
-    existente.value = '';
-    Array.from(select.options).forEach(o => o.style.display = '');
-    return; 
-  }
+  // Eliminar TODOS los buscadores existentes (no solo uno)
+  document.querySelectorAll('[id="buscar-' + selectId + '"]').forEach(el => el.remove());
   const input = document.createElement('input');
   input.type        = 'text';
   input.id          = 'buscar-' + selectId;
@@ -2952,12 +2953,10 @@ function imprimirExpediente(historialId) {
       <div class="seccion-body">${contenido}</div>
     </div>`;
 
-  const win = window.open('', '_blank');
-  if (!win) {
-    showToast('Permite las ventanas emergentes para imprimir expedientes', 'warning');
-    return; // ← Este return debe estar ANTES de win.document.write
-  }
-  win.document.write(`<!DOCTYPE html>
+  const isPWA = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+
+  const htmlExpediente = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -3349,8 +3348,22 @@ function imprimirExpediente(historialId) {
 
 </div>
 </body>
-</html>`);
-  win.document.close();
+</html>`;
+
+  if (isPWA) {
+    const frame = document.getElementById('print-frame');
+    if (!frame) { showToast('Error al preparar impresión', 'error'); return; }
+    frame.srcdoc = htmlExpediente;
+    frame.onload = () => {
+      try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch(e) { showToast('No se pudo abrir el diálogo de impresión', 'warning'); }
+    };
+  } else {
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Permite ventanas emergentes para imprimir expedientes', 'warning'); return; }
+    win.document.write(htmlExpediente);
+    win.document.close();
+  }
 }
 function formatHora(hora, timestamp) {
   if (timestamp) {
@@ -4179,13 +4192,35 @@ function imprimirTicket(ventaId) {
   const pagado   = calcularPagado(ventaId);
   const saldo    = Math.max(0, parseFloat(v.totalFinal || 0) - pagado);
   const pagos    = STATE.pagos.filter(p => String(p.ventaId) === String(ventaId));
-  const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'Logo-optica.ico';
+  const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'icon-192.png';
   const fechaHoy = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'long', year:'numeric' });
 
-  const win = window.open('', '_blank', 'width=420,height=700');
-  if (!win) { showToast('Permite ventanas emergentes para imprimir tickets', 'warning'); return; }
+  // Detectar si es PWA standalone (anclada al inicio)
+  const isPWA = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
 
-  win.document.write(`<!DOCTYPE html>
+  // En PWA usamos iframe; en navegador normal usamos window.open
+  const _imprimirContenido = (htmlContent) => {
+    if (isPWA) {
+      const frame = document.getElementById('print-frame');
+      if (!frame) { showToast('Error al preparar impresión', 'error'); return; }
+      frame.srcdoc = htmlContent;
+      frame.onload = () => {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        } catch(e) {
+          showToast('No se pudo abrir el diálogo de impresión', 'warning');
+        }
+      };
+    } else {
+      const win = window.open('', '_blank', 'width=420,height=700');
+      if (!win) { showToast('Permite ventanas emergentes para imprimir tickets', 'warning'); return; }
+      win.document.write(htmlContent);
+      win.document.close();
+    }
+  };
+  _imprimirContenido(`<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -4323,13 +4358,12 @@ function imprimirTicket(ventaId) {
     <div class="t-gracias">¡Gracias por su preferencia!</div>
     <div class="t-footer-sub">
       Óptica Aurora<br>
-      Xalapa, Ver. · Tel: (228) 000-0000<br>
+      Teziutlán, Pue. · Tel: (282) 129-2915<br>
       Impreso: ${fechaHoy}
     </div>
   </div>
 </div>
 </body></html>`);
-  win.document.close();
 }
 
 async function enviarTicketEmail(ventaId) {
@@ -4520,7 +4554,7 @@ async function enviarRecordatorioRevision(clienteId) {
       saldo:        `${mesesTexto} desde tu compra`,
       ultimo_pago:  `${lente}${fecha ? ' · adquiridos el ' + fecha : ''}`,
       mensaje:      `Hola ${c.nombre.split(' ')[0]}, han pasado ${mesesTexto} desde que adquiriste ${lente} en Óptica Aurora. ¡Queremos saber cómo te han ido! Te invitamos a pasar para una revisión sin costo. Recuerda que una buena graduación mejora tu calidad de vida. 👓`,
-      contacto:     'WhatsApp: (228) 000-0000',
+      contacto:     'WhatsApp: (282) 129-2915',
     });
     await registrarAuditoria('Pago', `Recordatorio de revisión enviado a ${c.nombre} (${mesesTexto} con ${lente})`);
     showToast(`Recordatorio enviado a ${c.nombre}`, 'success');
@@ -4563,10 +4597,10 @@ function generarReportePDF() {
   // ── Últimas 20 ventas ──
   const ultimasVentas = [...STATE.ventas].reverse().slice(0, 20);
 
-  const win = window.open('', '_blank');
-  if (!win) { showToast('Permite ventanas emergentes para generar el reporte', 'warning'); return; }
+  const isPWA = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
 
-  win.document.write(`<!DOCTYPE html>
+  const htmlReporte = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -4743,8 +4777,22 @@ function generarReportePDF() {
     <div class="rpt-footer-text">Generado el ${fechaHoy} · ${STATE.usuario?.nombre || ''}</div>
   </div>
 </div>
-</body></html>`);
-  win.document.close();
+</body></html>`;
+
+  if (isPWA) {
+    const frame = document.getElementById('print-frame');
+    if (!frame) { showToast('Error al preparar reporte', 'error'); return; }
+    frame.srcdoc = htmlReporte;
+    frame.onload = () => {
+      try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch(e) { showToast('No se pudo abrir el diálogo de impresión', 'warning'); }
+    };
+  } else {
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Permite ventanas emergentes para el reporte', 'warning'); return; }
+    win.document.write(htmlReporte);
+    win.document.close();
+  }
 }
 /* ══════════════════════════════════════════════════════════════
    🖼️  IMAGEN DE PRODUCTO
