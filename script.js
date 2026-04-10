@@ -928,7 +928,7 @@ async function eliminarCliente(id) {
     actualizarBadgeAdeudos();
   } catch (err) {
     showToast('Error al eliminar cliente', 'error');
-  } finally { hideLoading(); }
+} finally { hideLoading(); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1312,16 +1312,18 @@ async function cargarVentas() {
 }
 
 function calcularTotal() {
-  const precio     = parseFloat(val('venta-precio'))    || 0;
+  const precio      = parseFloat(val('venta-precio'))    || 0;
   const cantidadRaw = parseInt(val('venta-cantidad'));
-const cantidad    = (!isNaN(cantidadRaw) && cantidadRaw > 0) ? cantidadRaw : 1;
-  const descuento  = parseFloat(val('venta-descuento')) || 0;
-  const diferencia = val('venta-tipo') === 'cambio' ? (parseFloat(val('venta-diferencia')) || 0) : 0;
-  const subtotal   = (precio * cantidad) + diferencia;
-  const total      = Math.max(0, subtotal - descuento);
-  // Si estamos editando y el precio está vacío, no sobreescribir el total existente
-  const ventaId = val('venta-id');
-  if (ventaId && precio === 0 && diferencia === 0) return;
+  const cantidad    = (!isNaN(cantidadRaw) && cantidadRaw > 0) ? cantidadRaw : 1;
+  const descuento   = parseFloat(val('venta-descuento')) || 0;
+  const tipo        = val('venta-tipo');
+  const diferencia  = tipo === 'cambio' ? (parseFloat(val('venta-diferencia')) || 0) : 0;
+  const subtotal    = (precio * cantidad) + diferencia;
+  const total       = Math.max(0, subtotal - descuento);
+
+  // Solo omitir el cálculo si el campo precio está literalmente vacío (usuario no lo llenó aún)
+  const precioInput = document.getElementById('venta-precio');
+  if (!precioInput?.value.trim() && !val('venta-id')) return;
 
   const descuentoInput = document.getElementById('venta-descuento');
   if (descuento < 0) {
@@ -1522,36 +1524,35 @@ try {
       data.id = id;
       await apiPost(CONFIG.HOJAS.VENTAS, 'update', data);
       const idx = STATE.ventas.findIndex(v => String(v.id) === String(id));
-      const ventaSnap = idx > -1 ? { ...STATE.ventas[idx] } : null;
-    if (idx > -1) STATE.ventas[idx] = { ...STATE.ventas[idx], ...data };
-// Si el anticipo editado es mayor al ya pagado, registrar la diferencia
+const ventaSnap = idx > -1 ? { ...STATE.ventas[idx] } : null;
+
+// ── Corregir anticipo ANTES de guardar en Sheets ──
 const yaRegistrado = calcularPagado(id);
 const nuevoAnticipo = parseFloat(data.anticipo) || 0;
-if (nuevoAnticipo > yaRegistrado) {
-    const diferenciaPago = nuevoAnticipo - yaRegistrado;
-    await guardarPagoInterno({
-        clienteId: data.clienteId,
-        clienteNombre: cliente?.nombre,
-        ventaId: id,
-        monto: diferenciaPago,
-        metodo: data.metodo,
-        fecha: data.fecha,
-        notas: 'Anticipo actualizado al editar venta',
-    });
-    } else if (nuevoAnticipo < yaRegistrado) {
-    data.anticipo = yaRegistrado;
-    // Re-guardar en Sheets con el anticipo corregido
-// Corregir anticipo antes de guardar — evita doble escritura
-const yaRegistradoPre = calcularPagado(id);
-const anticipoSolicitado = parseFloat(data.anticipo) || 0;
-if (anticipoSolicitado < yaRegistradoPre) {
-  data.anticipo = yaRegistradoPre;
+if (nuevoAnticipo < yaRegistrado) {
+  data.anticipo = yaRegistrado;
   showToast(
-    `Anticipo ajustado a ${formatMoney(yaRegistradoPre)} — los pagos previos no cambian.`,
-    'warning', 6000
+    `Anticipo ajustado a ${formatMoney(yaRegistrado)} — los pagos previos no se modifican.`,
+    'warning', 5000
   );
 }
-    }
+
+await apiPost(CONFIG.HOJAS.VENTAS, 'update', data);
+if (idx > -1) STATE.ventas[idx] = { ...STATE.ventas[idx], ...data };
+
+// Si el anticipo ingresado supera lo ya cobrado, registrar la diferencia como pago
+if (nuevoAnticipo > yaRegistrado) {
+  const diferenciaPago = nuevoAnticipo - yaRegistrado;
+  await guardarPagoInterno({
+    clienteId: data.clienteId,
+    clienteNombre: cliente?.nombre,
+    ventaId: id,
+    monto: diferenciaPago,
+    metodo: data.metodo,
+    fecha: data.fecha,
+    notas: 'Anticipo actualizado al editar venta',
+  });
+}
 
 
       // ── Ajustar stock considerando cambio de tipo, producto y cantidad ──
@@ -1817,14 +1818,14 @@ async function savePago() {
     showToast('Esta venta es una garantía sin costo, no requiere pago', 'warning');
     rehabBtn(); return;
   }
-  if (Math.round(monto * 100) > Math.round(saldoActual * 100)) {
-    showToast(`El pago (${formatMoney(monto)}) supera el saldo pendiente (${formatMoney(saldoActual)})`, 'warning');
-    rehabBtn(); return;
-  }
-  if (saldoActual === 0) {
+if (saldoActual === 0) {
     showToast('Esta venta ya está completamente pagada', 'warning');
     rehabBtn(); return;
-  }
+}
+if (Math.round(monto * 100) > Math.round(saldoActual * 100)) {
+    showToast(`El pago (${formatMoney(monto)}) supera el saldo pendiente (${formatMoney(saldoActual)})`, 'warning');
+    rehabBtn(); return;
+}
 
   const cliente = STATE.clientes.find(c => c.id == clienteId);
   if (!cliente) {
@@ -2230,9 +2231,9 @@ function renderDashboard() {
   }
     renderGraficas();
   // Verificar revisiones solo si hay datos cargados
-  if (STATE.clientes.length > 0 && STATE.ventas.length >= 0) {
+if (STATE.clientes.length > 0) {
     verificarRevisionesAnuales();
-  }
+}
   feather.replace();
 }
 
@@ -2503,15 +2504,24 @@ function llenarSelectsClientes() {
     const el = document.getElementById(selectId);
     if (!el) return;
 
-    // Guardar valor seleccionado actualmente para restaurarlo
     const valorAnterior = el.value;
-
-    // Eliminar buscador existente antes de reconstruir el select
     const buscarExistente = document.getElementById('buscar-' + selectId);
+    const queryAnterior = buscarExistente?.value || '';
+
+    // Eliminar buscador existente antes de reconstruir
     if (buscarExistente) buscarExistente.remove();
 
     el.innerHTML = opts;
     agregarBuscadorCliente(selectId);
+
+    // Restaurar query de búsqueda si había uno activo
+    if (queryAnterior) {
+      const nuevoInput = document.getElementById('buscar-' + selectId);
+      if (nuevoInput) {
+        nuevoInput.value = queryAnterior;
+        nuevoInput.dispatchEvent(new Event('input'));
+      }
+    }
 
     // Restaurar selección previa si el cliente sigue existiendo
     if (valorAnterior && Array.from(el.options).some(o => o.value === valorAnterior)) {
@@ -4165,9 +4175,9 @@ function agruparVentas(ventas, periodo, hoyRef, campo) {
         : grupo.reduce((s, v) => s + parseFloat(v.totalFinal || 0), 0);
     });
   }
-  // Fallback: si llega un período desconocido, devolver array vacío del tamaño correcto
   console.warn('agruparVentas: período desconocido →', periodo);
-  return Array(7).fill(0);
+  const tamano = labels?.length || 7;
+  return Array(tamano).fill(0);
 } 
 
 /* ══════════════════════════════════════════════════════════════
