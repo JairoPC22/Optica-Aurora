@@ -82,6 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Fecha en topbar
   actualizarFechaTopbar();
+// Actualizar cada minuto
+setInterval(actualizarFechaTopbar, 60000);
 
   // Fecha por defecto en campos de fecha
   setFechasHoy();
@@ -1504,10 +1506,10 @@ const data = {
       ? STATE.ventas.find(v => String(v.id) === String(ventaIdActual))
       : null;
 // Solo sumar la cantidad anterior si ESA venta sí consumió stock (no era garantía)
-const anteriorConsumiòStock = ventaAnterior &&
+const anteriorConsumoStock = ventaAnterior &&
   String(ventaAnterior.productoId).trim() === String(productoId).trim() &&
   ventaAnterior.tipo !== 'garantia';
-const stockEfectivo = anteriorConsumiòStock
+const stockEfectivo = anteriorConsumoStock
   ? parseInt(prod?.stock || 0) + parseInt(ventaAnterior.cantidad || 1)
   : parseInt(prod?.stock || 0);
     if (prod && stockEfectivo < cantidad) {
@@ -1520,13 +1522,11 @@ const id = val('venta-id');
   if (btnGuardarVenta) { btnGuardarVenta.disabled = true; btnGuardarVenta.textContent = 'Guardando...'; }
   showLoading(id ? 'Actualizando venta...' : 'Guardando venta...');
 try {
-    if (id) {
+if (id) {
       data.id = id;
-      await apiPost(CONFIG.HOJAS.VENTAS, 'update', data);
       const idx = STATE.ventas.findIndex(v => String(v.id) === String(id));
 const ventaSnap = idx > -1 ? { ...STATE.ventas[idx] } : null;
 
-// ── Corregir anticipo ANTES de guardar en Sheets ──
 const yaRegistrado = calcularPagado(id);
 const nuevoAnticipo = parseFloat(data.anticipo) || 0;
 if (nuevoAnticipo < yaRegistrado) {
@@ -1539,21 +1539,6 @@ if (nuevoAnticipo < yaRegistrado) {
 
 await apiPost(CONFIG.HOJAS.VENTAS, 'update', data);
 if (idx > -1) STATE.ventas[idx] = { ...STATE.ventas[idx], ...data };
-
-// Si el anticipo ingresado supera lo ya cobrado, registrar la diferencia como pago
-if (nuevoAnticipo > yaRegistrado) {
-  const diferenciaPago = nuevoAnticipo - yaRegistrado;
-  await guardarPagoInterno({
-    clienteId: data.clienteId,
-    clienteNombre: cliente?.nombre,
-    ventaId: id,
-    monto: diferenciaPago,
-    metodo: data.metodo,
-    fecha: data.fecha,
-    notas: 'Anticipo actualizado al editar venta',
-  });
-}
-
 
       // ── Ajustar stock considerando cambio de tipo, producto y cantidad ──
       {
@@ -1606,8 +1591,7 @@ if (nuevoAnticipo > yaRegistrado) {
       showToast('Venta actualizada', 'success');
     } else {
     const res = await apiPost(CONFIG.HOJAS.VENTAS, 'create', data);
-    // El servidor de Apps Script genera su propio UUID con Utilities.getUuid()
-    // Siempre usar el ID del servidor para que pagos y ventas coincidan
+// Usar siempre el ID confirmado por el servidor (coincide con el generado en cliente)
     data.id = res.id || data.id;
     STATE.ventas.push({ ...data }); 
     if (data.anticipo > 0) {
@@ -1716,6 +1700,8 @@ function editarVenta(id) {
   document.getElementById('venta-total').value = formatMoney(v.totalFinal);
   calcularRestante();
   setHTML('modal-venta-title', 'Editar Venta');
+// Forzar recálculo consistente con los valores restaurados
+calcularTotal();
 }
 
 async function eliminarVenta(id) {
@@ -1964,15 +1950,12 @@ function abrirPagoCliente(clienteId) {
     showToast('Este cliente no tiene ventas con saldo pendiente', 'info');
     return;
   }
-  openModal('modal-pago');
-  // Asignar DESPUÉS de que openModal terminó de limpiar
-  setTimeout(() => {
-    const sel = document.getElementById('pago-cliente');
-    if (sel) {
-      sel.value = clienteId;
-      loadVentasDeCliente();
-    }
-  }, 0);
+openModal('modal-pago');
+const sel = document.getElementById('pago-cliente');
+if (sel) {
+  sel.value = clienteId;
+  loadVentasDeCliente();
+}
 }
 
 function abrirPagoVenta(ventaId) {
@@ -1988,12 +1971,11 @@ function abrirPagoVenta(ventaId) {
     showToast('Esta venta ya está completamente pagada ✓', 'info');
     return;
   }
-  openModal('modal-pago');
-  setTimeout(() => {
-    document.getElementById('pago-cliente').value  = venta.clienteId;
-    document.getElementById('pago-venta-id').value = ventaId;
-    loadVentasDeCliente(ventaId);
-  }, 0);
+openModal('modal-pago');
+// openModal ya terminó de limpiar, ahora podemos setear directamente
+document.getElementById('pago-cliente').value  = venta.clienteId;
+document.getElementById('pago-venta-id').value = ventaId;
+loadVentasDeCliente(ventaId);
 }
 
 function loadVentasDeCliente(preseleccionarVentaId = null) {
@@ -2630,10 +2612,11 @@ function toggleSidebar() {
     } else {
       if (overlay) overlay.remove();
     }
-  } else {
-    sidebar.classList.toggle('collapsed');
-    main.classList.toggle('expanded');
-  }
+} else {
+  sidebar.classList.toggle('collapsed');
+  main.classList.toggle('expanded');
+  document.body.classList.toggle('sidebar-collapsed');
+}
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2651,12 +2634,20 @@ const CAMPOS_IGNORAR = new Set([
   ]);
   const VALORES_DEFAULT = new Set(['1','0','0.00','3']);
   const inputs = modalActivo.querySelectorAll('input:not([type=hidden]):not([readonly]), textarea');
-  const hayDatos = [...inputs].some(el => {
+  const selects = modalActivo.querySelectorAll('select:not([id$="-tipo"]):not([id$="-metodo"])');
+  
+  const hayDatosInputs = [...inputs].some(el => {
     const v = el.value.trim();
     if (CAMPOS_IGNORAR.has(el.id)) return false;
     if (VALORES_DEFAULT.has(v)) return false;
     return v !== '';
   });
+
+  const hayDatosSelects = [...selects].some(el => {
+    return el.value !== '' && el.value !== undefined;
+  });
+
+  const hayDatos = hayDatosInputs || hayDatosSelects;
   if (hayDatos) {
     if (!confirm('¿Cerrar sin guardar? Los datos ingresados se perderán.')) return;
   }
@@ -3467,13 +3458,11 @@ function cambiarPaginaPagos(pagina) {
   STATE.paginacion.pagos.pagina = pagina;
   const q      = val('search-pagos').toLowerCase();
   const metodo = val('filter-metodo-pago');
-  const lista  = STATE.pagos
-    .filter(pago => {
-      const c = STATE.clientes.find(x => x.id == pago.clienteId);
-      return (!q || c?.nombre?.toLowerCase().includes(q) || pago.clienteNombre?.toLowerCase().includes(q))
-          && (!metodo || pago.metodo === metodo);
-    })
-    .sort((a, b) => (b.fecha || '0000-00-00').localeCompare(a.fecha || '0000-00-00'));
+  const lista  = STATE.pagos.filter(pago => {
+    const c = STATE.clientes.find(x => x.id == pago.clienteId);
+    return (!q || c?.nombre?.toLowerCase().includes(q) || pago.clienteNombre?.toLowerCase().includes(q))
+        && (!metodo || pago.metodo === metodo);
+  });
   renderPagos(lista);
 }
 
@@ -4175,9 +4164,8 @@ function agruparVentas(ventas, periodo, hoyRef, campo) {
         : grupo.reduce((s, v) => s + parseFloat(v.totalFinal || 0), 0);
     });
   }
-  console.warn('agruparVentas: período desconocido →', periodo);
-  const tamano = labels?.length || 7;
-  return Array(tamano).fill(0);
+console.warn('agruparVentas: período desconocido →', periodo);
+return Array(7).fill(0);
 } 
 
 /* ══════════════════════════════════════════════════════════════
@@ -4456,10 +4444,12 @@ function verificarRevisionesAnuales() {
 
 function toggleRevisionDetalle() {
   const detalle = document.getElementById('revision-detalle');
+  const btn = document.querySelector('#revision-anual-alerta .btn-sm');
   if (!detalle) return;
 
   if (!detalle.classList.contains('hidden')) {
     detalle.classList.add('hidden');
+    if (btn) btn.textContent = `Ver lista (${(STATE._revisionesPendientes || []).length})`;
     return;
   }
 
@@ -4500,6 +4490,8 @@ function toggleRevisionDetalle() {
       `;
     }).join('');
 
+  detalle.classList.remove('hidden');
+  if (btn) btn.textContent = `Ocultar lista`;
   detalle.classList.remove('hidden');
   feather.replace();
 }
