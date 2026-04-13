@@ -2727,10 +2727,11 @@ function openModal(id) {
      'historial-parpados','historial-pestanas','historial-cejas','historial-conjuntiva',
      'historial-oftalmoscopia','historial-grad-ant-od','historial-grad-ant-oi',
      'historial-eje-od','historial-eje-oi','historial-material',
-     'historial-rx-od','historial-rx-oi','historial-rx-add'
+     'historial-rx-od','historial-rx-oi','historial-rx-add',
+     'historial-prueba-amb'
     ].forEach(f => { const e = document.getElementById(f); if(e) e.value = ''; });
     ['historial-aumento','historial-usa-lentes','historial-usa-contacto',
-     'historial-prueba-amb','historial-reloj-neutralizado','historial-bicro-neutralizado'
+    'historial-reloj-neutralizado','historial-bicro-neutralizado'
     ].forEach(f => { const e = document.getElementById(f); if(e) e.value = ''; });
     document.getElementById('historial-cliente').value = '';
     const buscarHC = document.getElementById('buscar-historial-cliente');
