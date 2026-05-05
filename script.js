@@ -41,6 +41,7 @@ const STATE = {
   clienteActivo: null,
   _filtroAdeudos: 'todos',
   _revisionesPendientes: [],
+  _colaPendiente: 0,
     paginacion: {
     clientes:  { pagina: 1, porPagina: 50 },
     ventas:    { pagina: 1, porPagina: 50 },
@@ -48,6 +49,157 @@ const STATE = {
     historial: { pagina: 1, porPagina: 50 },
   }
 };
+/* ══════════════════════════════════════════════════════════════
+   💾  MODO OFFLINE — IndexedDB + Cola de operaciones
+══════════════════════════════════════════════════════════════ */
+
+const _IDB = { nombre: 'aurora_offline', version: 1, db: null };
+
+async function idbAbrir() {
+  if (_IDB.db) return _IDB.db;
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(_IDB.nombre, _IDB.version);
+    req.onupgradeneeded = ({ target: { result: db } }) => {
+      if (!db.objectStoreNames.contains('cache'))
+        db.createObjectStore('cache', { keyPath: 'clave' });
+      if (!db.objectStoreNames.contains('cola'))
+        db.createObjectStore('cola', { keyPath: 'colId', autoIncrement: true });
+    };
+    req.onsuccess = ({ target: { result: db } }) => { _IDB.db = db; resolve(db); };
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function idbGuardar(clave, valor) {
+  try {
+    const db = await idbAbrir();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('cache', 'readwrite');
+      tx.objectStore('cache').put({ clave, valor });
+      tx.oncomplete = res;
+      tx.onerror    = () => rej(tx.error);
+    });
+  } catch { /* sin IndexedDB disponible → ignorar */ }
+}
+
+async function idbLeer(clave) {
+  try {
+    const db = await idbAbrir();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction('cache', 'readonly');
+      const req = tx.objectStore('cache').get(clave);
+      req.onsuccess = () => res(req.result?.valor ?? null);
+      req.onerror   = () => rej(req.error);
+    });
+  } catch { return null; }
+}
+
+async function idbEncolar(hoja, action, data) {
+  try {
+    const db = await idbAbrir();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction('cola', 'readwrite');
+      const req = tx.objectStore('cola').add({ hoja, action, data, ts: Date.now() });
+      req.onsuccess = () => res(req.result);
+      req.onerror   = () => rej(req.error);
+    });
+  } catch { return null; }
+}
+
+async function idbCola() {
+  try {
+    const db = await idbAbrir();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction('cola', 'readonly');
+      const req = tx.objectStore('cola').getAll();
+      req.onsuccess = () => res(req.result ?? []);
+      req.onerror   = () => rej(req.error);
+    });
+  } catch { return []; }
+}
+
+async function idbEliminarDeCola(colId) {
+  try {
+    const db = await idbAbrir();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('cola', 'readwrite');
+      tx.objectStore('cola').delete(colId);
+      tx.oncomplete = res;
+      tx.onerror    = () => rej(tx.error);
+    });
+  } catch {}
+}
+
+function actualizarIndicadorOffline() {
+  const online     = navigator.onLine;
+  const pendientes = STATE._colaPendiente || 0;
+  const el         = document.getElementById('offline-indicator');
+  if (!el) return;
+
+  if (!online) {
+    el.innerHTML   = '⚡ Sin conexión' + (pendientes ? ` · ${pendientes} en cola` : '');
+    el.className   = 'offline-badge offline-badge-warn';
+    el.onclick     = null;
+    el.style.display = '';
+  } else if (pendientes > 0) {
+    el.innerHTML   = `🔄 ${pendientes} pendiente${pendientes > 1 ? 's' : ''} — toca para sincronizar`;
+    el.className   = 'offline-badge offline-badge-sync';
+    el.onclick     = () => sincronizarCola();
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+    el.onclick = null;
+  }
+}
+
+async function sincronizarCola() {
+  if (!navigator.onLine) { showToast('Aún sin conexión', 'warning'); return; }
+  const cola = await idbCola();
+  if (!cola.length) {
+    STATE._colaPendiente = 0;
+    actualizarIndicadorOffline();
+    return;
+  }
+
+  showLoading(`Sincronizando ${cola.length} cambio${cola.length > 1 ? 's' : ''}...`);
+  let ok = 0, fail = 0;
+
+  for (const op of cola) {
+    try {
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 25000);
+      const res   = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        signal: ctrl.signal,
+        body: JSON.stringify({ hoja: op.hoja, action: op.action, payload: op.data, token: 'aurora_x9k2mZ8pQr' }),
+      });
+      clearTimeout(timer);
+      const json = await res.json();
+      if (json.ok !== false) { await idbEliminarDeCola(op.colId); ok++; }
+      else fail++;
+    } catch { fail++; }
+  }
+
+  hideLoading();
+  STATE._colaPendiente = fail;
+  actualizarIndicadorOffline();
+
+  if (ok > 0) {
+    showToast(`✓ ${ok} cambio${ok > 1 ? 's' : ''} guardado${ok > 1 ? 's' : ''} en Google Sheets`, 'success', 5000);
+    await Promise.allSettled([
+      cargarClientes(), cargarVentas(), cargarPagos(),
+      cargarHistorial(), cargarAuditoria(), cargarInventario(),
+    ]);
+    renderDashboard();
+    filterClientes(); filterVentas(); filterPagos();
+    filterHistorial(); filterGarantias(); filterAdeudosBusqueda();
+    filterInventario(); llenarSelectsClientes(); actualizarBadgeAdeudos();
+    feather.replace();
+  }
+  if (fail > 0) {
+    showToast(`⚠️ ${fail} cambio${fail > 1 ? 's' : ''} sin sincronizar — se reintentará al reconectar`, 'warning', 6000);
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════
    🚀  INICIALIZACIÓN
@@ -110,6 +262,21 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ── Eventos de conectividad ──
+window.addEventListener('online', async () => {
+  actualizarIndicadorOffline();
+  showToast('Conexión restaurada', 'success', 3000);
+  if (STATE.usuario) await sincronizarCola();
+});
+
+window.addEventListener('offline', () => {
+  actualizarIndicadorOffline();
+  showToast('Sin conexión — los cambios se guardarán localmente', 'warning', 5000);
+});
+
+// Estado inicial del indicador
+actualizarIndicadorOffline();
+
 }); 
 
 function setFechasHoy() {
@@ -150,13 +317,37 @@ async function handleLogin(e) {
   spinner.classList.remove('hidden');
   error.classList.add('hidden');
 
+  // ── Sin conexión → intentar sesión guardada localmente ──
+  if (!navigator.onLine) {
+    const raw = localStorage.getItem('aurora_sesion_local');
+    if (raw) {
+      try {
+        const u = JSON.parse(raw);
+        if (u._usuario === usuario) {
+          STATE.usuario = u;
+          sessionStorage.setItem('aurora_usuario', JSON.stringify(u));
+          btn.disabled = false;
+          btnText.textContent = 'Ingresar al Sistema';
+          spinner.classList.add('hidden');
+          showToast('Modo offline — usando sesión guardada', 'warning', 5000);
+          iniciarApp();
+          return;
+        }
+      } catch {}
+    }
+    error.querySelector('span').textContent = 'Sin conexión y no hay sesión guardada. Conéctate a internet para el primer inicio.';
+    error.classList.remove('hidden');
+    feather.replace();
+    btn.disabled = false;
+    btnText.textContent = 'Ingresar al Sistema';
+    spinner.classList.add('hidden');
+    return;
+  }
+
   try {
     const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'login',
-        payload: { usuario, contrasena },
-      }),
+      body: JSON.stringify({ action: 'login', payload: { usuario, contrasena } }),
     });
     const json = await res.json();
 
@@ -166,6 +357,8 @@ async function handleLogin(e) {
     } else {
       STATE.usuario = json.usuario;
       sessionStorage.setItem('aurora_usuario', JSON.stringify(STATE.usuario));
+      // Guardar sesión para uso offline (sin contraseña)
+      localStorage.setItem('aurora_sesion_local', JSON.stringify({ ...STATE.usuario, _usuario: usuario }));
       iniciarApp();
     }
   } catch (err) {
@@ -182,6 +375,7 @@ async function handleLogin(e) {
 
 function handleLogout() {
   sessionStorage.removeItem('aurora_usuario');
+  localStorage.removeItem('aurora_sesion_local');
   STATE.usuario = null;
   STATE.clientes = [];
   STATE.ventas   = [];
@@ -225,14 +419,20 @@ function togglePassword() {
 ══════════════════════════════════════════════════════════════ */
 
 async function iniciarApp() {
-  // Ocultar login, mostrar app
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
 
-  // Mostrar datos de usuario
   renderUsuarioUI();
 
-  // Cargar todos los datos
+  // Verificar cola pendiente del IndexedDB
+  const colaInicial = await idbCola();
+  STATE._colaPendiente = colaInicial.length;
+  actualizarIndicadorOffline();
+
+  if (!navigator.onLine) {
+    showToast('Abriendo en modo offline — mostrando datos guardados', 'warning', 5000);
+  }
+
   showLoading('Cargando datos del sistema...');
   try {
     const resultados = await Promise.allSettled([
@@ -290,11 +490,19 @@ function renderUsuarioUI() {
 ══════════════════════════════════════════════════════════════ */
 
 async function apiGet(hoja, params = {}) {
-  if (!STATE.usuario) { handleLogout(); return { data: [] }; } 
+  if (!STATE.usuario) { handleLogout(); return { data: [] }; }
+
+  // ── Sin conexión → leer del caché IndexedDB ──
+  if (!navigator.onLine) {
+    const cached = await idbLeer(`hoja_${hoja}`);
+    if (cached) return { data: cached };
+    return { data: [] };
+  }
+
   const url = new URL(CONFIG.APPS_SCRIPT_URL);
   url.searchParams.set('hoja', hoja);
-url.searchParams.set('action', 'get');
-url.searchParams.set('token', 'aurora_x9k2mZ8pQr')
+  url.searchParams.set('action', 'get');
+  url.searchParams.set('token', 'aurora_x9k2mZ8pQr');
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const controller = new AbortController();
@@ -303,19 +511,36 @@ url.searchParams.set('token', 'aurora_x9k2mZ8pQr')
     const res  = await fetch(url.toString(), { signal: controller.signal });
     const json = await res.json();
     clearTimeout(timer);
-    return { data: json.data || [] };
+    const data = json.data || [];
+    // Guardar en IndexedDB para uso offline
+    idbGuardar(`hoja_${hoja}`, data).catch(() => {});
+    return { data };
   } catch (err) {
     clearTimeout(timer);
     if (err.name === 'AbortError') throw new Error('Tiempo de espera agotado. Verifica tu conexión.');
+    // Falló la red → intentar caché local
+    const cached = await idbLeer(`hoja_${hoja}`);
+    if (cached) {
+      showToast('Sin conexión — mostrando datos guardados localmente', 'warning', 5000);
+      return { data: cached };
+    }
     throw err;
   }
 }
 
 async function apiPost(hoja, action, data) {
   if (!STATE.usuario && action !== 'login') { handleLogout(); return { ok: false }; }
-if (action === 'create' && !data.id) {
+  if (action === 'create' && !data.id) {
     data.id = 'id_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
-}
+  }
+
+  // ── Sin conexión → encolar operación ──
+  if (!navigator.onLine && action !== 'login') {
+    await idbEncolar(hoja, action, data);
+    STATE._colaPendiente = (STATE._colaPendiente || 0) + 1;
+    actualizarIndicadorOffline();
+    return { ok: true, id: data.id, _offline: true };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
@@ -332,6 +557,14 @@ if (action === 'create' && !data.id) {
   } catch (err) {
     clearTimeout(timer);
     if (err.name === 'AbortError') throw new Error('Tiempo de espera agotado. Verifica tu conexión.');
+    // Red caída inesperadamente → encolar
+    if (!navigator.onLine || err.message === 'Failed to fetch') {
+      await idbEncolar(hoja, action, data);
+      STATE._colaPendiente = (STATE._colaPendiente || 0) + 1;
+      actualizarIndicadorOffline();
+      showToast('Sin conexión — cambio guardado localmente', 'warning', 4000);
+      return { ok: true, id: data.id, _offline: true };
+    }
     throw err;
   }
 }

@@ -2175,3 +2175,25 @@ body.dark .kpi-periodo-tabs,
 body.dark .ventas-periodo-tabs { background: #131f2e; border-color: #2a3f55; }
 body.dark .kpi-periodo-tab.active,
 body.dark .ventas-periodo-tab.active { background: #1e2d3d; color: #e2eaf4; }
+/* ── OFFLINE BADGE ── */
+.offline-badge {
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .28rem .75rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  cursor: default;
+}
+.offline-badge-warn {
+  background: rgba(251,192,45,.15);
+  color: var(--amarillo);
+  border: 1px solid rgba(251,192,45,.3);
+}
+.offline-badge-sync {
+  background: rgba(79,195,199,.12);
+  color: var(--turquesa-dark);
+  border: 1px solid rgba(79,195,199,.25);
+  cursor: pointer;
+}
+body.dark .offline-badge-warn { background: rgba(251,192,45,.08); border-color: rgba(251,192,45,.2); }
+body.dark .offline-badge-sync { background: rgba(79,195,199,.08); border-color: rgba(79,195,199,.2); }

@@ -1,69 +1,186 @@
-const CACHE_NAME = 'aurora-v 4.8';
-const ASSETS = [
+'use strict';
+
+const CACHE = 'aurora-v3';
+const SHELL = [
   './',
   './index.html',
-  './styles.css',
   './script.js',
-  './manifest.json',
+  './styles.css',
   './Logo-optica.ico',
+  './manifest.json',
+];
+
+// Recursos externos que queremos cachear para offline
+const CDN_PRECACHE = [
+  'https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+  'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
+  'https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache =>
-        // Cachear individualmente para que un fallo no bloquee todo
-        Promise.allSettled(
-          ASSETS.map(url =>
-            cache.add(url).catch(err => console.warn('No se pudo cachear:', url, err))
-          )
-        )
-      )
+    caches.open(CACHE)
+      .then(c => {
+        // Shell local — falla si alguno no existe (correcto)
+        return c.addAll(SHELL).then(() => {
+          // CDN — cachear con ignorar errores individuales
+          return Promise.allSettled(
+            CDN_PRECACHE.map(url =>
+              fetch(url, { mode: 'cors' })
+                .then(res => { if (res.ok) c.put(url, res); })
+                .catch(() => {/* sin conexión al instalar → se cachea al primer uso */})
+            )
+          );
+        });
+      })
       .then(() => self.skipWaiting())
   );
 });
 
-// Activar — limpiar caches viejos
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch — red primero, cache como fallback
 self.addEventListener('fetch', e => {
-  // No interceptar llamadas a Google Apps Script (siempre necesitan red)
-  // No interceptar APIs externas que siempre necesitan red
-  if (
-    e.request.url.includes('script.google.com') ||
-    e.request.url.includes('emailjs.com') ||
-    e.request.url.includes('cdn.emailjs') ||
-    e.request.url.includes('cdn.jsdelivr.net') ||
-    e.request.url.includes('fonts.googleapis.com') ||
-    e.request.url.includes('fonts.gstatic.com')
-  ) return;
+  const url = new URL(e.request.url);
 
+  // ── Google Apps Script (API principal) → solo red, sin cachear ──
+  if (
+    url.hostname.includes('script.google.com') ||
+    url.hostname.includes('script.googleusercontent.com')
+  ) {
+    e.respondWith(
+      fetch(e.request).catch(() =>
+        new Response(
+          JSON.stringify({ ok: false, data: [], error: 'offline' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+    );
+    return;
+  }
+
+  // ── EmailJS → solo red ──
+  if (url.hostname.includes('emailjs.com')) {
+    e.respondWith(
+      fetch(e.request).catch(() =>
+        new Response(
+          JSON.stringify({ status: 0, error: 'offline' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+    );
+    return;
+  }
+
+  // ── Solo interceptar GET ──
+  if (e.request.method !== 'GET') {
+    e.respondWith(
+      fetch(e.request).catch(() =>
+        new Response(
+          JSON.stringify({ ok: false, error: 'offline' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+    );
+    return;
+  }
+
+  // ── Google Fonts CSS → red primero, caché si falla ──
+  if (url.hostname.includes('fonts.googleapis.com')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request).then(c => c || new Response('', { status: 503 })))
+    );
+    return;
+  }
+
+  // ── Google Fonts archivos de fuente → caché primero (no cambian) ──
+  if (url.hostname.includes('fonts.gstatic.com')) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        }).catch(() => new Response('', { status: 503 }));
+      })
+    );
+    return;
+  }
+
+  // ── CDN (feather, chart.js, emailjs) → caché primero ──
+  if (url.hostname.includes('cdn.jsdelivr.net')) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        }).catch(() => new Response('', { status: 503 }));
+      })
+    );
+    return;
+  }
+
+  // ── cdnjs (three.js u otros) → caché primero ──
+  if (url.hostname.includes('cdnjs.cloudflare.com')) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        }).catch(() => new Response('', { status: 503 }));
+      })
+    );
+    return;
+  }
+
+  // ── Archivos locales (shell de la app) → caché primero ──
   e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        // Si la respuesta es válida, actualizamos el cache
-        if (res && res.status === 200 && res.type === 'basic') {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, resClone));
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      })
-      .catch(() => caches.match(e.request).then(cached => {
-    if (cached) return cached;
-    if (e.request.mode === 'navigate') {
-        return new Response(
-        '<html><body style="font-family:sans-serif;text-align:center;padding:3rem"><h2>Sin conexión</h2><p>Verifica tu internet e intenta de nuevo.</p><button onclick="location.reload()">Reintentar</button></body></html>',
-        { headers: { 'Content-Type': 'text/html' } }
-        );
-    }
-    return new Response('', { status: 503, statusText: 'Sin conexión' });
-    }))
+      }).catch(() => {
+        // Si piden index.html y no hay red → devolver la versión cacheada del shell
+        if (e.request.destination === 'document') {
+          return caches.match('./index.html');
+        }
+        return new Response('', { status: 503 });
+      });
+    })
   );
+});
+
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
