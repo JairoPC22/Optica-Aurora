@@ -2197,3 +2197,50 @@ body.dark .ventas-periodo-tab.active { background: #1e2d3d; color: #e2eaf4; }
 }
 body.dark .offline-badge-warn { background: rgba(251,192,45,.08); border-color: rgba(251,192,45,.2); }
 body.dark .offline-badge-sync { background: rgba(79,195,199,.08); border-color: rgba(79,195,199,.2); }
+
+/* ── OFFLINE BADGE ── */
+.offline-badge {
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .28rem .75rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  cursor: default;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.offline-badge-warn {
+  background: rgba(251,192,45,.15);
+  color: var(--amarillo);
+  border: 1px solid rgba(251,192,45,.3);
+}
+.offline-badge-sync {
+  background: rgba(79,195,199,.12);
+  color: var(--turquesa-dark);
+  border: 1px solid rgba(79,195,199,.25);
+  cursor: pointer;
+}
+body.dark .offline-badge-warn { background: rgba(251,192,45,.08); border-color: rgba(251,192,45,.2); }
+body.dark .offline-badge-sync { background: rgba(79,195,199,.08); border-color: rgba(79,195,199,.2); }
+
+/* En móvil: el badge va debajo del topbar como una barra fija */
+@media (max-width: 768px) {
+  #offline-indicator {
+    position: fixed;
+    top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+    left: 0;
+    right: 0;
+    z-index: 49;
+    border-radius: 0;
+    text-align: center;
+    max-width: 100%;
+    padding: .35rem 1rem;
+    font-size: .76rem;
+  }
+
+  /* Empujar el contenido principal para que no quede tapado */
+  body:has(#offline-indicator[style*="display"]:not([style*="none"])) .main-content {
+    padding-top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px) + 30px);
+  }
+}
