@@ -207,16 +207,16 @@
             <p class="section-desc">Resumen general del sistema</p>
           </div>
           <div style="display:flex;gap:.6rem;">
-            <button class="btn-outline" onclick="generarReportePDF()">
-              <i data-feather="file-text"></i> Reporte PDF
-            </button>
+          <button id="btn-reporte-pdf" class="btn-outline" onclick="generarReportePDF()">
+            <i data-feather="file-text"></i> Reporte PDF <span id="reporte-periodo-label" style="font-weight:400;font-size:.76rem;opacity:.7;margin-left:.1rem"></span>
+          </button>
             <button class="btn-primary" onclick="refreshDashboard()">
               <i data-feather="refresh-cw"></i> Actualizar
             </button>
           </div>
         </div>
 
-        <!-- ALERTAS DE REVISIÓN ANUAL -->
+<!-- ALERTAS DE REVISIÓN ANUAL -->
         <div id="revision-anual-alerta" class="revision-alerta hidden">
           <div class="revision-header">
             <div class="revision-icon">📅</div>
@@ -228,12 +228,26 @@
           </div>
           <div id="revision-detalle" class="revision-detalle hidden"></div>
         </div>
+
+        <!-- FILTRO DE PERÍODO PARA KPIs -->
+        <div class="kpi-periodo-bar">
+          <div class="kpi-periodo-tabs" id="kpi-periodo-tabs">
+            <button class="kpi-periodo-tab active" onclick="cambiarPeriodoKpi('mes', this)">Este mes</button>
+            <button class="kpi-periodo-tab" onclick="cambiarPeriodoKpi('semana', this)">Esta semana</button>
+            <button class="kpi-periodo-tab" onclick="cambiarPeriodoKpi('año', this)">Este año</button>
+            <button class="kpi-periodo-tab" onclick="cambiarPeriodoKpi('total', this)">Total histórico</button>
+          </div>
+          <div class="kpi-periodo-custom">
+            <input type="month" id="kpi-mes-custom" class="select-sm" style="font-size:.78rem;min-width:140px;" oninput="cambiarPeriodoKpiMes(this.value)" title="Seleccionar mes específico" />
+          </div>
+        </div>
+
         <div class="kpi-grid">
           <div class="kpi-card kpi-blue">
             <div class="kpi-icon"><i data-feather="users"></i></div>
             <div class="kpi-data">
               <div class="kpi-value" id="kpi-clientes">—</div>
-              <div class="kpi-label">Total Clientes</div>
+              <div class="kpi-label">Clientes con venta</div>
             </div>
           </div>
           <div class="kpi-card kpi-teal">
@@ -475,24 +489,24 @@
         </div>
       </section>
 
-      <!-- ══════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════
            💰 SECCIÓN: VENTAS
       ══════════════════════════════════════════════ -->
       <section id="section-ventas" class="section">
         <div class="section-header">
-  <div>
-    <h1 class="section-title">Ventas</h1>
-    <p class="section-desc">Registro de ventas y productos</p>
-  </div>
-  <div style="display:flex;gap:.6rem;align-items:center;">
-    <button class="btn-outline" onclick="exportVentas()">
-      <i data-feather="download"></i> Exportar
-    </button>
-    <button class="btn-primary" onclick="openModal('modal-venta')">
-      <i data-feather="plus"></i> Nueva Venta
-    </button>
-</div>
-  </div>
+          <div>
+            <h1 class="section-title">Ventas</h1>
+            <p class="section-desc">Registro de ventas y productos</p>
+          </div>
+          <div style="display:flex;gap:.6rem;align-items:center;">
+            <button class="btn-outline" onclick="exportVentas()">
+              <i data-feather="download"></i> Exportar
+            </button>
+            <button class="btn-primary" onclick="openModal('modal-venta')">
+              <i data-feather="plus"></i> Nueva Venta
+            </button>
+          </div>
+        </div>
 
         <div class="card">
           <div class="card-toolbar">
@@ -506,6 +520,18 @@
               <option value="garantia">Garantía</option>
               <option value="cambio">Cambio</option>
             </select>
+            <div class="ventas-periodo-tabs" id="ventas-periodo-tabs">
+              <button class="ventas-periodo-tab active" onclick="cambiarPeriodoVentas('todo', this)" title="Todas las ventas">Todas</button>
+              <button class="ventas-periodo-tab" onclick="cambiarPeriodoVentas('semana', this)" title="Esta semana">Semana</button>
+              <button class="ventas-periodo-tab" onclick="cambiarPeriodoVentas('mes', this)" title="Este mes">Mes</button>
+              <button class="ventas-periodo-tab" onclick="cambiarPeriodoVentas('año', this)" title="Este año">Año</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:.3rem;">
+              <input type="date" id="ventas-fecha-desde" class="select-sm" style="min-width:130px;font-size:.78rem;" oninput="filtrarVentasRango()" title="Desde" />
+              <span style="color:var(--gris-label);font-size:.8rem;">—</span>
+              <input type="date" id="ventas-fecha-hasta" class="select-sm" style="min-width:130px;font-size:.78rem;" oninput="filtrarVentasRango()" title="Hasta" />
+              <button class="btn-sm" onclick="limpiarFiltroVentasFecha()" title="Limpiar fechas">✕</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table class="table">
@@ -526,11 +552,10 @@
                 <tr><td colspan="9" class="empty-row">Cargando ventas...</td></tr>
               </tbody>
             </table>
-                      </div>
-                        <div id="paginacion-ventas"></div>
+          </div>
+          <div id="paginacion-ventas"></div>
         </div>
       </section>
-
       <!-- ══════════════════════════════════════════════
            💳 SECCIÓN: PAGOS
       ══════════════════════════════════════════════ -->
@@ -948,7 +973,7 @@
     </div>
   </div>
 
-  <!-- ── MODAL: HISTORIAL CLÍNICO ── -->
+<!-- ── MODAL: HISTORIAL CLÍNICO ── -->
   <div class="modal modal-wide" id="modal-historial">
     <div class="modal-header">
       <h2 id="modal-historial-title">Nuevo Registro Clínico</h2>
@@ -966,353 +991,284 @@
         <label>Fecha</label>
         <input type="date" id="historial-fecha" />
       </div>
-<!-- MOTIVO DE CONSULTA -->
-<div class="clinica-section">
-  <h4 class="clinica-title">Motivo de Consulta</h4>
-  <div class="form-group">
-    <label>Motivo de su visita</label>
-    <textarea id="historial-motivo" rows="2" placeholder="¿Por qué acude hoy?"></textarea>
-  </div>
-  <h4 class="clinica-title" style="margin-top:.8rem">Síntomas Oculares</h4>
-  <div class="sintomas-grid">
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Escozor"> Escozor</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Epífora"> Epífora</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Dolor ocular"> Dolor ocular</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Hiperemia"> Hiperemia</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Secreción"> Secreción</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Fotofobia"> Fotofobia</label>
-  </div>
-  <h4 class="clinica-title" style="margin-top:.8rem">Síntomas Visuales</h4>
-  <div class="sintomas-grid">
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Disminución visión lejana"> Disminución visión lejana</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Disminución visión cercana"> Disminución visión cercana</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Diplopía"> Diplopía</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Halos"> Halos de colores</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Salto de renglón"> Salto de renglón</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Moscas volantes"> Moscas volantes</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Visión en túnel"> Visión en túnel</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Cefalea"> Cefalea</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Fatiga visual"> Fatiga visual</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Baja de peso"> Baja de peso</label>
-    <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Fatiga"> Fatiga general</label>
-  </div>
-  <div class="form-grid-2" style="margin-top:.8rem">
-    <div class="form-group">
-      <label>¿Desde cuándo presenta molestias?</label>
-      <input type="text" id="historial-desde-cuando" placeholder="Ej: 2 semanas, 1 mes..." />
-    </div>
-    <div class="form-group">
-      <label>¿A qué lo atribuye?</label>
-      <input type="text" id="historial-atribuye" placeholder="Ej: cansancio, pantallas..." />
-    </div>
-    <div class="form-group">
-      <label>¿Ha ido en aumento?</label>
-      <select id="historial-aumento">
-        <option value="">— Seleccionar —</option>
-        <option value="Sí">Sí</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>¿Ha tomado algún medicamento?</label>
-      <input type="text" id="historial-medicamento" placeholder="Nombre del medicamento o 'Ninguno'" />
-    </div>
-  </div>
-</div>
 
-<!-- ANTECEDENTES REFRACTOMÉTRICOS -->
-<div class="clinica-section">
-  <h4 class="clinica-title">Antecedentes Refractométricos</h4>
-  <div class="form-grid-2">
-    <div class="form-group">
-      <label>Último examen de la vista</label>
-      <input type="text" id="historial-ultimo-examen" placeholder="Ej: hace 2 años, nunca..." />
-    </div>
-    <div class="form-group">
-      <label>¿Utiliza lentes?</label>
-      <select id="historial-usa-lentes">
-        <option value="">— Seleccionar —</option>
-        <option value="Sí">Sí</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>¿Desde cuándo usa lentes?</label>
-      <input type="text" id="historial-tiempo-lentes" placeholder="Ej: 5 años..." />
-    </div>
-    <div class="form-group">
-      <label>Cambios de graduación</label>
-      <input type="number" id="historial-cambios-graduacion" placeholder="Número de cambios" min="0" />
-    </div>
-    <div class="form-group">
-      <label>¿Utiliza lentes de contacto?</label>
-      <select id="historial-usa-contacto">
-        <option value="">— Seleccionar —</option>
-        <option value="Sí">Sí</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>¿Desde cuándo usa lentes de contacto?</label>
-      <input type="text" id="historial-tiempo-contacto" placeholder="Ej: 1 año..." />
-    </div>
-  </div>
-</div>
-
-<!-- ANTECEDENTES HEREDOFAMILIARES -->
-<div class="clinica-section">
-  <h4 class="clinica-title">Antecedentes Heredofamiliares</h4>
-  <div class="sintomas-grid">
-    <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Glaucoma"> Glaucoma</label>
-    <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Cataratas"> Cataratas</label>
-    <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Queratocono"> Queratocono</label>
-    <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Diabetes"> Diabetes</label>
-    <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Hipertensión"> Hipertensión</label>
-    <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Terigión"> Terigión</label>
-  </div>
-  <div class="form-group" style="margin-top:.8rem">
-    <label>¿Alguna cirugía ocular?</label>
-    <input type="text" id="historial-cirugia" placeholder="Describe o escribe 'Ninguna'" />
-  </div>
-</div>
-      <!-- Agudeza Visual -->
-      <div class="clinica-section">
-        <h4 class="clinica-title">Agudeza Visual</h4>
-        <div class="av-grid">
-          <!-- AVL S/C -->
-          <div class="av-block">
-            <div class="av-label">AVL S/C</div>
-            <div class="av-row">
-              <span class="av-eye">OD</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="avlsc-od" placeholder="___" />
+      <!-- SECCIÓN 1: MOTIVO DE CONSULTA -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>💬 Motivo de Consulta</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="form-group">
+              <label>Motivo de su visita</label>
+              <textarea id="historial-motivo" rows="2" placeholder="¿Por qué acude hoy?"></textarea>
             </div>
-            <div class="av-row">
-              <span class="av-eye">OI</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="avlsc-oi" placeholder="___" />
+            <h4 class="clinica-title" style="margin-top:.8rem">Síntomas Oculares</h4>
+            <div class="sintomas-grid">
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Escozor"> Escozor</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Epífora"> Epífora</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Dolor ocular"> Dolor ocular</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Hiperemia"> Hiperemia</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Secreción"> Secreción</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Fotofobia"> Fotofobia</label>
             </div>
-            <div class="av-row">
-              <span class="av-eye">AO</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="avlsc-ao" placeholder="___" />
+            <h4 class="clinica-title" style="margin-top:.8rem">Síntomas Visuales</h4>
+            <div class="sintomas-grid">
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Disminución visión lejana"> Disminución visión lejana</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Disminución visión cercana"> Disminución visión cercana</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Diplopía"> Diplopía</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Halos"> Halos de colores</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Salto de renglón"> Salto de renglón</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Moscas volantes"> Moscas volantes</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Visión en túnel"> Visión en túnel</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Cefalea"> Cefalea</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Fatiga visual"> Fatiga visual</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Baja de peso"> Baja de peso</label>
+              <label class="checkbox-label"><input type="checkbox" name="sintoma" value="Fatiga"> Fatiga general</label>
             </div>
-          </div>
-          <!-- AVL C/C -->
-          <div class="av-block">
-            <div class="av-label">AVL C/C</div>
-            <div class="av-row">
-              <span class="av-eye">OD</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="avlcc-od" placeholder="___" />
-            </div>
-            <div class="av-row">
-              <span class="av-eye">OI</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="avlcc-oi" placeholder="___" />
-            </div>
-            <div class="av-row">
-              <span class="av-eye">AO</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="avlcc-ao" placeholder="___" />
-            </div>
-          </div>
-          <!-- VC S/C -->
-          <div class="av-block">
-            <div class="av-label">VC S/C</div>
-            <div class="av-row">
-              <span class="av-eye">OD</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="vcsc-od" placeholder="___" />
-            </div>
-            <div class="av-row">
-              <span class="av-eye">OI</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="vcsc-oi" placeholder="___" />
-            </div>
-            <div class="av-row">
-              <span class="av-eye">AO</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="vcsc-ao" placeholder="___" />
-            </div>
-          </div>
-          <!-- VC C/C -->
-          <div class="av-block">
-            <div class="av-label">VC C/C</div>
-            <div class="av-row">
-              <span class="av-eye">OD</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="vccc-od" placeholder="___" />
-            </div>
-            <div class="av-row">
-              <span class="av-eye">OI</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="vccc-oi" placeholder="___" />
-            </div>
-            <div class="av-row">
-              <span class="av-eye">AO</span>
-              <span class="av-prefix">20/</span>
-              <input type="text" class="av-input" id="vccc-ao" placeholder="___" />
+            <div class="form-grid-2" style="margin-top:.8rem">
+              <div class="form-group">
+                <label>¿Desde cuándo presenta molestias?</label>
+                <input type="text" id="historial-desde-cuando" placeholder="Ej: 2 semanas, 1 mes..." />
+              </div>
+              <div class="form-group">
+                <label>¿A qué lo atribuye?</label>
+                <input type="text" id="historial-atribuye" placeholder="Ej: cansancio, pantallas..." />
+              </div>
+              <div class="form-group">
+                <label>¿Ha ido en aumento?</label>
+                <select id="historial-aumento">
+                  <option value="">— Seleccionar —</option>
+                  <option value="Sí">Sí</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>¿Ha tomado algún medicamento?</label>
+                <input type="text" id="historial-medicamento" placeholder="Nombre del medicamento o 'Ninguno'" />
+              </div>
             </div>
           </div>
         </div>
       </div>
-<!-- TOMA DE AGUDEZA VISUAL COMPLETA -->
-<div class="clinica-section">
-  <h4 class="clinica-title">Toma de Agudeza Visual — Detalles</h4>
-  <div class="form-grid-2">
-    <div class="form-group">
-      <label>PH 20/ OD</label>
-      <input type="text" id="ph-od" placeholder="Ej: 20" />
-    </div>
-    <div class="form-group">
-      <label>PH 20/ OI</label>
-      <input type="text" id="ph-oi" placeholder="Ej: 20" />
-    </div>
-    <div class="form-group">
-      <label>RELOJ OD</label>
-      <input type="text" id="reloj-od" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>RELOJ OI</label>
-      <input type="text" id="reloj-oi" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>BICRO OD</label>
-      <input type="text" id="bicro-od" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>BICRO OI</label>
-      <input type="text" id="bicro-oi" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>MPP OD</label>
-      <input type="text" id="mpp-od" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>MPP OI</label>
-      <input type="text" id="mpp-oi" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>Altura</label>
-      <input type="text" id="historial-altura" placeholder="mm" />
-    </div>
-    <div class="form-group">
-      <label>Distancia Interpupilar</label>
-      <input type="text" id="historial-dip" placeholder="mm" />
-    </div>
-    <div class="form-group">
-      <label>Dist. Naso Pupilar OD</label>
-      <input type="text" id="historial-dnp-od" placeholder="mm" />
-    </div>
-    <div class="form-group">
-      <label>Dist. Naso Pupilar OI</label>
-      <input type="text" id="historial-dnp-oi" placeholder="mm" />
-    </div>
-    <div class="form-group">
-      <label>ADD</label>
-      <input type="text" id="historial-add" placeholder="" />
-    </div>
-  </div>
-</div>
 
-<!-- REVISIÓN DE ANEXOS -->
-<div class="clinica-section">
-  <h4 class="clinica-title">Revisión de Anexos</h4>
-  <div class="form-grid-2">
-    <div class="form-group">
-      <label>Párpados</label>
-      <input type="text" id="historial-parpados" placeholder="Normal / Alterado..." />
-    </div>
-    <div class="form-group">
-      <label>Pestañas</label>
-      <input type="text" id="historial-pestanas" placeholder="Normal / Alterado..." />
-    </div>
-    <div class="form-group">
-      <label>Cejas</label>
-      <input type="text" id="historial-cejas" placeholder="Normal / Alterado..." />
-    </div>
-    <div class="form-group">
-      <label>Conjuntiva</label>
-      <input type="text" id="historial-conjuntiva" placeholder="Normal / Alterado..." />
-    </div>
-    <div class="form-group" style="grid-column:1/-1">
-      <label>Oftalmoscopía y Retinoscopia</label>
-      <textarea id="historial-oftalmoscopia" rows="2" placeholder="Hallazgos..."></textarea>
-    </div>
-  </div>
-</div>
-
-<!-- GRADUACIÓN Y RX FINAL -->
-<div class="clinica-section">
-  <h4 class="clinica-title">Graduación de Lentes Anteriores y RX Final</h4>
-  <div class="form-grid-2">
-    <div class="form-group">
-      <label>Grad. anterior OD</label>
-      <input type="text" id="historial-grad-ant-od" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>Grad. anterior OI</label>
-      <input type="text" id="historial-grad-ant-oi" placeholder="" />
-    </div>
-    <div class="form-group">
-      <label>Eje astigmático OD</label>
-      <input type="text" id="historial-eje-od" placeholder="°" />
-    </div>
-    <div class="form-group">
-      <label>Eje astigmático OI</label>
-      <input type="text" id="historial-eje-oi" placeholder="°" />
-    </div>
-    <div class="form-group">
-  <label>Prueba ambulatoria</label>
-  <input type="text" id="historial-prueba-amb" placeholder="Ej: Sí, No, Pendiente..." />
-</div>
-    <div class="form-group">
-      <label>Reloj astigmático (neutralizado)</label>
-      <select id="historial-reloj-neutralizado">
-        <option value="">—</option>
-        <option value="Sí">Sí</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Bicromatica (neutralizado)</label>
-      <select id="historial-bicro-neutralizado">
-        <option value="">—</option>
-        <option value="Sí">Sí</option>
-        <option value="No">No</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Material de lente</label>
-      <input type="text" id="historial-material" placeholder="Ej: CR-39, policarbonato..." />
-    </div>
-    <div class="form-group">
-      <label>RX Final OD</label>
-      <input type="text" id="historial-rx-od" placeholder="Esfera / Cilindro / Eje" />
-    </div>
-    <div class="form-group">
-      <label>RX Final OI</label>
-      <input type="text" id="historial-rx-oi" placeholder="Esfera / Cilindro / Eje" />
-    </div>
-    <div class="form-group">
-      <label>ADD (RX Final)</label>
-      <input type="text" id="historial-rx-add" placeholder="" />
-    </div>
-  </div>
-</div>
-      
-      <!-- Diagnóstico y observaciones -->
-      <div class="form-grid-2">
-        <div class="form-group">
-          <label>Diagnóstico</label>
-          <textarea id="historial-diagnostico" rows="3" placeholder="Diagnóstico del optometrista..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Observaciones</label>
-          <textarea id="historial-observaciones" rows="3" placeholder="Observaciones adicionales..."></textarea>
+      <!-- SECCIÓN 2: ANTECEDENTES REFRACTOMÉTRICOS -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>🔬 Antecedentes Refractométricos</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Último examen de la vista</label>
+                <input type="text" id="historial-ultimo-examen" placeholder="Ej: hace 2 años, nunca..." />
+              </div>
+              <div class="form-group">
+                <label>¿Utiliza lentes?</label>
+                <select id="historial-usa-lentes">
+                  <option value="">— Seleccionar —</option>
+                  <option value="Sí">Sí</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>¿Desde cuándo usa lentes?</label>
+                <input type="text" id="historial-tiempo-lentes" placeholder="Ej: 5 años..." />
+              </div>
+              <div class="form-group">
+                <label>Cambios de graduación</label>
+                <input type="number" id="historial-cambios-graduacion" placeholder="Número de cambios" min="0" />
+              </div>
+              <div class="form-group">
+                <label>¿Utiliza lentes de contacto?</label>
+                <select id="historial-usa-contacto">
+                  <option value="">— Seleccionar —</option>
+                  <option value="Sí">Sí</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>¿Desde cuándo usa lentes de contacto?</label>
+                <input type="text" id="historial-tiempo-contacto" placeholder="Ej: 1 año..." />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- SECCIÓN 3: ANTECEDENTES HEREDOFAMILIARES -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>🧬 Antecedentes Heredofamiliares</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="sintomas-grid">
+              <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Glaucoma"> Glaucoma</label>
+              <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Cataratas"> Cataratas</label>
+              <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Queratocono"> Queratocono</label>
+              <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Diabetes"> Diabetes</label>
+              <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Hipertensión"> Hipertensión</label>
+              <label class="checkbox-label"><input type="checkbox" name="antecedente" value="Terigión"> Terigión</label>
+            </div>
+            <div class="form-group" style="margin-top:.8rem">
+              <label>¿Alguna cirugía ocular?</label>
+              <input type="text" id="historial-cirugia" placeholder="Describe o escribe 'Ninguna'" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 4: REVISIÓN DE ANEXOS -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>🔎 Revisión de Anexos</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Párpados</label>
+                <input type="text" id="historial-parpados" placeholder="Normal / Alterado..." />
+              </div>
+              <div class="form-group">
+                <label>Pestañas</label>
+                <input type="text" id="historial-pestanas" placeholder="Normal / Alterado..." />
+              </div>
+              <div class="form-group">
+                <label>Cejas</label>
+                <input type="text" id="historial-cejas" placeholder="Normal / Alterado..." />
+              </div>
+              <div class="form-group">
+                <label>Conjuntiva</label>
+                <input type="text" id="historial-conjuntiva" placeholder="Normal / Alterado..." />
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label>Oftalmoscopía y Retinoscopia</label>
+                <textarea id="historial-oftalmoscopia" rows="2" placeholder="Hallazgos..."></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 5: AGUDEZA VISUAL -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>👁️ Agudeza Visual</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="av-grid">
+              <!-- AVL S/C -->
+              <div class="av-block">
+                <div class="av-label">AVL S/C</div>
+                <div class="av-row"><span class="av-eye">OD</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="avlsc-od" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">OI</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="avlsc-oi" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">AO</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="avlsc-ao" placeholder="___" /></div>
+              </div>
+              <!-- AVL C/C -->
+              <div class="av-block">
+                <div class="av-label">AVL C/C</div>
+                <div class="av-row"><span class="av-eye">OD</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="avlcc-od" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">OI</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="avlcc-oi" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">AO</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="avlcc-ao" placeholder="___" /></div>
+              </div>
+              <!-- VC S/C -->
+              <div class="av-block">
+                <div class="av-label">VC S/C</div>
+                <div class="av-row"><span class="av-eye">OD</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="vcsc-od" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">OI</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="vcsc-oi" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">AO</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="vcsc-ao" placeholder="___" /></div>
+              </div>
+              <!-- VC C/C -->
+              <div class="av-block">
+                <div class="av-label">VC C/C</div>
+                <div class="av-row"><span class="av-eye">OD</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="vccc-od" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">OI</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="vccc-oi" placeholder="___" /></div>
+                <div class="av-row"><span class="av-eye">AO</span><span class="av-prefix">20/</span><input type="text" class="av-input" id="vccc-ao" placeholder="___" /></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 6: TOMA DE AGUDEZA VISUAL COMPLETA -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>📐 Toma de Agudeza Visual — Detalles</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="form-grid-2">
+              <div class="form-group"><label>PH 20/ OD</label><input type="text" id="ph-od" placeholder="Ej: 20" /></div>
+              <div class="form-group"><label>PH 20/ OI</label><input type="text" id="ph-oi" placeholder="Ej: 20" /></div>
+              <div class="form-group"><label>RELOJ OD</label><input type="text" id="reloj-od" /></div>
+              <div class="form-group"><label>RELOJ OI</label><input type="text" id="reloj-oi" /></div>
+              <div class="form-group"><label>BICRO OD</label><input type="text" id="bicro-od" /></div>
+              <div class="form-group"><label>BICRO OI</label><input type="text" id="bicro-oi" /></div>
+              <div class="form-group"><label>MPP OD</label><input type="text" id="mpp-od" /></div>
+              <div class="form-group"><label>MPP OI</label><input type="text" id="mpp-oi" /></div>
+              <div class="form-group"><label>Altura</label><input type="text" id="historial-altura" placeholder="mm" /></div>
+              <div class="form-group"><label>Distancia Interpupilar</label><input type="text" id="historial-dip" placeholder="mm" /></div>
+              <div class="form-group"><label>Dist. Naso Pupilar OD</label><input type="text" id="historial-dnp-od" placeholder="mm" /></div>
+              <div class="form-group"><label>Dist. Naso Pupilar OI</label><input type="text" id="historial-dnp-oi" placeholder="mm" /></div>
+              <div class="form-group"><label>ADD</label><input type="text" id="historial-add" /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 7: GRADUACIÓN Y RX FINAL -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>📋 Graduación de Lentes Anteriores y RX Final</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="clinica-section">
+            <div class="form-grid-2">
+              <div class="form-group"><label>Grad. anterior OD</label><input type="text" id="historial-grad-ant-od" /></div>
+              <div class="form-group"><label>Grad. anterior OI</label><input type="text" id="historial-grad-ant-oi" /></div>
+              <div class="form-group"><label>Eje astigmático OD</label><input type="text" id="historial-eje-od" placeholder="°" /></div>
+              <div class="form-group"><label>Eje astigmático OI</label><input type="text" id="historial-eje-oi" placeholder="°" /></div>
+              <div class="form-group"><label>Prueba ambulatoria</label><input type="text" id="historial-prueba-amb" placeholder="Ej: Sí, No, Pendiente..." /></div>
+              <div class="form-group"><label>RX Final OD</label><input type="text" id="historial-rx-od" placeholder="Esfera / Cilindro / Eje" /></div>
+              <div class="form-group"><label>RX Final OI</label><input type="text" id="historial-rx-oi" placeholder="Esfera / Cilindro / Eje" /></div>
+              <div class="form-group"><label>ADD (RX Final)</label><input type="text" id="historial-rx-add" /></div>
+              <div class="form-group"><label>Material de lente</label><input type="text" id="historial-material" placeholder="Ej: CR-39, policarbonato..." /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 8: DIAGNÓSTICO Y OBSERVACIONES -->
+      <div class="clinica-acordeon">
+        <button type="button" class="acordeon-header" onclick="toggleAcordeon(this)">
+          <span>📝 Diagnóstico y Observaciones</span>
+          <i data-feather="chevron-down" class="acordeon-icon"></i>
+        </button>
+        <div class="acordeon-body">
+          <div class="form-grid-2" style="padding:.5rem 0;">
+            <div class="form-group">
+              <label>Diagnóstico</label>
+              <textarea id="historial-diagnostico" rows="3" placeholder="Diagnóstico del optometrista..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>Observaciones</label>
+              <textarea id="historial-observaciones" rows="3" placeholder="Observaciones adicionales..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
     <div class="modal-footer">
       <button class="btn-outline" onclick="closeAllModals()">Cancelar</button>
@@ -1683,8 +1639,6 @@
       <p id="loading-text">Procesando...</p>
     </div>
   </div>
-<!-- iframe oculto para impresión en PWA — no eliminar -->
-  <iframe id="print-frame" style="display:none;position:absolute;width:0;height:0;border:0;" title="Impresión"></iframe>
   <!-- iframe oculto para impresión en PWA — no eliminar -->
   <iframe id="print-frame" style="display:none;position:absolute;width:0;height:0;border:0;" title="Impresión"></iframe>
 
