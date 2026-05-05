@@ -2206,9 +2206,6 @@ body.dark .offline-badge-sync { background: rgba(79,195,199,.08); border-color: 
   border-radius: 99px;
   white-space: nowrap;
   cursor: default;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .offline-badge-warn {
   background: rgba(251,192,45,.15);
@@ -2224,23 +2221,16 @@ body.dark .offline-badge-sync { background: rgba(79,195,199,.08); border-color: 
 body.dark .offline-badge-warn { background: rgba(251,192,45,.08); border-color: rgba(251,192,45,.2); }
 body.dark .offline-badge-sync { background: rgba(79,195,199,.08); border-color: rgba(79,195,199,.2); }
 
-/* En móvil: el badge va debajo del topbar como una barra fija */
-@media (max-width: 768px) {
-  #offline-indicator {
-    position: fixed;
-    top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
-    left: 0;
-    right: 0;
-    z-index: 49;
-    border-radius: 0;
-    text-align: center;
-    max-width: 100%;
-    padding: .35rem 1rem;
-    font-size: .76rem;
-  }
-
-  /* Empujar el contenido principal para que no quede tapado */
-  body:has(#offline-indicator[style*="display"]:not([style*="none"])) .main-content {
-    padding-top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px) + 30px);
-  }
+/* En TODOS los tamaños: badge fijo bajo el topbar, no ocupa espacio en el flujo */
+#offline-indicator {
+  position: fixed;
+  top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  z-index: 49;
+  border-radius: 0;
+  text-align: center;
+  padding: .35rem 1rem;
+  font-size: .76rem;
+  max-width: 100%;
 }
