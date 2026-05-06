@@ -2582,15 +2582,15 @@ function renderDashboard() {
 
   const dashBody = document.getElementById('dash-adeudos-body');
   if (dashBody) {
-    if (!conSaldo.length) {
+if (!conSaldo.length) {
       dashBody.innerHTML = '<tr><td colspan="4" class="empty-row">¡Sin adeudos pendientes! 🎉</td></tr>';
     } else {
       dashBody.innerHTML = conSaldo.map(v => `
         <tr>
-          <td><strong>${esc(v._c?.nombre || v.clienteNombre || '—')}</strong></td>
-          <td class="mono">${esc(v._c?.telefono || '—')}</td>
-          <td class="mono text-red fw-bold">${formatMoney(v._saldo)}</td>
-          <td>${estadoBadge(calcularEstadoVenta(v))}</td>
+          <td data-label="Cliente"><strong>${esc(v._c?.nombre || v.clienteNombre || '—')}</strong></td>
+          <td data-label="Teléfono" class="mono">${esc(v._c?.telefono || '—')}</td>
+          <td data-label="Adeudo" class="mono text-red fw-bold">${formatMoney(v._saldo)}</td>
+          <td data-label="Estado">${estadoBadge(calcularEstadoVenta(v))}</td>
         </tr>
       `).join('');
     }
