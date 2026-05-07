@@ -158,7 +158,7 @@
         </button>
 
         <div class="nav-section-label">SISTEMA</div>
-        <button class="nav-item" onclick="navigateTo('auditoria')" data-section="auditoria">
+        <button class="nav-item" id="nav-item-auditoria" onclick="navigateTo('auditoria')" data-section="auditoria">
           <i data-feather="activity"></i>
           <span>Auditoría</span>
         </button>
@@ -230,7 +230,7 @@
         </div>
 
         <!-- FILTRO DE PERÍODO PARA KPIs -->
-        <div class="kpi-periodo-bar">
+<div class="kpi-periodo-bar">
           <div class="kpi-periodo-tabs" id="kpi-periodo-tabs">
             <button class="kpi-periodo-tab active" onclick="cambiarPeriodoKpi('mes', this)">Este mes</button>
             <button class="kpi-periodo-tab" onclick="cambiarPeriodoKpi('semana', this)">Esta semana</button>
@@ -239,6 +239,11 @@
           </div>
           <div class="kpi-periodo-custom">
             <input type="month" id="kpi-mes-custom" class="select-sm" style="font-size:.78rem;min-width:140px;" oninput="cambiarPeriodoKpiMes(this.value)" title="Seleccionar mes específico" />
+          </div>
+          <div id="dash-empleado-wrap" class="hidden">
+            <select id="filter-empleado-dash" class="select-sm" onchange="cambiarFiltroEmpleadoDash(this.value)" style="min-width:190px;font-size:.78rem;">
+              <option value="">👤 Todos los empleados</option>
+            </select>
           </div>
         </div>
 
@@ -520,6 +525,11 @@
               <option value="garantia">Garantía</option>
               <option value="cambio">Cambio</option>
             </select>
+            <div id="ventas-empleado-wrap" class="hidden">
+              <select id="filter-empleado-ventas" class="select-sm" onchange="filterVentas()">
+                <option value="">👤 Todos los empleados</option>
+              </select>
+            </div>
             <div class="ventas-periodo-tabs" id="ventas-periodo-tabs">
               <button class="ventas-periodo-tab active" onclick="cambiarPeriodoVentas('todo', this)" title="Todas las ventas">Todas</button>
               <button class="ventas-periodo-tab" onclick="cambiarPeriodoVentas('semana', this)" title="Esta semana">Semana</button>
@@ -543,7 +553,9 @@
                   <th>Total</th>
                   <th>Pagado</th>
                   <th>Restante</th>
-                  <th>Fecha</th>
+                  <th class="sort-th" data-col="fecha" onclick="toggleOrdenVentas('fecha')" style="cursor:pointer;user-select:none;white-space:nowrap;">
+                    Fecha <span class="sort-icon">↓</span>
+                  </th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>

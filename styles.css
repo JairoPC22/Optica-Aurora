@@ -2243,3 +2243,24 @@ body.dark .offline-badge-sync {
   color: var(--turquesa);
   border-bottom-color: rgba(79,195,199,.2);
 }
+/* ── SORT HEADERS EN TABLA VENTAS ── */
+.sort-th {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition);
+}
+.sort-th:hover {
+  color: var(--turquesa-dark);
+}
+.sort-th.sort-asc .sort-icon,
+.sort-th.sort-desc .sort-icon {
+  color: var(--turquesa-dark);
+  font-weight: 700;
+}
+.sort-icon {
+  display: inline-block;
+  margin-left: .3rem;
+  font-size: .8rem;
+  color: var(--gris-medio);
+  transition: color var(--transition);
+}

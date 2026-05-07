@@ -42,6 +42,7 @@ const STATE = {
   _filtroAdeudos: 'todos',
   _revisionesPendientes: [],
   _colaPendiente: 0,
+  _filtroEmpleadoDash: null,
     paginacion: {
     clientes:  { pagina: 1, porPagina: 50 },
     ventas:    { pagina: 1, porPagina: 50 },
@@ -386,7 +387,7 @@ function handleLogout() {
   STATE.clienteActivo = null;
   STATE._filtroAdeudos = 'todos';
   STATE._revisionesPendientes = [];
-  // Resetear tab visual de adeudos
+  STATE._filtroEmpleadoDash = null;
   document.querySelectorAll('#filter-adeudos .filter-tab').forEach((t, i) => {
     t.classList.toggle('active', i === 0);
   });
@@ -424,7 +425,6 @@ async function iniciarApp() {
 
   renderUsuarioUI();
 
-  // Verificar cola pendiente del IndexedDB
   const colaInicial = await idbCola();
   STATE._colaPendiente = colaInicial.length;
   actualizarIndicadorOffline();
@@ -461,6 +461,7 @@ STATE._periodoKpi = 'mes';
     renderGarantias();
     renderAuditoria();
     llenarSelectsClientes();
+    llenarSelectEmpleados();
     actualizarBadgeAdeudos();
     renderInventario();
     initImagenDropZone();
@@ -483,6 +484,17 @@ function renderUsuarioUI() {
   setHTML('sidebar-avatar', initials);
   setHTML('topbar-avatar', initials);
   setText('topbar-username', u.nombre.split(' ')[0]);
+
+  const esAdmin = ['admin', 'administrador'].includes((u.rol || '').toLowerCase());
+
+  const navAuditoria = document.getElementById('nav-item-auditoria');
+  if (navAuditoria) navAuditoria.style.display = esAdmin ? '' : 'none';
+
+  const ventasEmpleadoWrap = document.getElementById('ventas-empleado-wrap');
+  if (ventasEmpleadoWrap) ventasEmpleadoWrap.classList.toggle('hidden', !esAdmin);
+
+  const dashEmpleadoWrap = document.getElementById('dash-empleado-wrap');
+  if (dashEmpleadoWrap) dashEmpleadoWrap.classList.toggle('hidden', !esAdmin);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -641,31 +653,52 @@ function filterAuditoria() {
 }
 
 function exportVentas() {
-  // Llenar select de empleados con los que han registrado ventas
+  // Usar la lista ya filtrada actualmente en pantalla
+  const ventasFiltradas = _filtrarVentasLista();
+
+  // Llenar select de empleados con los que aparecen en el filtro actual
   const empleados = [...new Set(STATE.ventas.map(v => v.registradoPor).filter(Boolean))].sort();
   const sel = document.getElementById('export-empleado');
   if (sel) {
     sel.innerHTML = '<option value="">— Todos los empleados —</option>'
       + empleados.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+    // Preseleccionar el empleado activo si hay filtro
+    const empActivo = val('filter-empleado-ventas');
+    if (empActivo) sel.value = empActivo;
   }
 
-  // Fechas por defecto: mes actual
-  const hoy = new Date();
+  // Fechas: precargar con el rango activo en pantalla
   const fechaDesdeEl = document.getElementById('export-fecha-desde');
   const fechaHastaEl = document.getElementById('export-fecha-hasta');
-  // Siempre actualizar con el mes actual al abrir el modal
-  const primer = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  if (fechaDesdeEl) fechaDesdeEl.value = fechaLocal(primer);
-  if (fechaHastaEl) fechaHastaEl.value = fechaLocal(hoy);
+  const hoy = new Date();
 
-  // Mostrar preview de cuántas ventas se exportarían
+  if (_periodoVentas === 'rango') {
+    if (fechaDesdeEl) fechaDesdeEl.value = document.getElementById('ventas-fecha-desde')?.value || '';
+    if (fechaHastaEl) fechaHastaEl.value = document.getElementById('ventas-fecha-hasta')?.value || '';
+  } else if (_periodoVentas === 'semana') {
+    const ini = new Date(hoy); ini.setDate(hoy.getDate() - 6);
+    if (fechaDesdeEl) fechaDesdeEl.value = fechaLocal(ini);
+    if (fechaHastaEl) fechaHastaEl.value = fechaLocal(hoy);
+  } else if (_periodoVentas === 'mes') {
+    if (fechaDesdeEl) fechaDesdeEl.value = fechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    if (fechaHastaEl) fechaHastaEl.value = fechaLocal(hoy);
+  } else if (_periodoVentas === 'año') {
+    if (fechaDesdeEl) fechaDesdeEl.value = fechaLocal(new Date(hoy.getFullYear(), 0, 1));
+    if (fechaHastaEl) fechaHastaEl.value = fechaLocal(hoy);
+  } else {
+    // 'todo' — sin fechas
+    if (fechaDesdeEl) fechaDesdeEl.value = '';
+    if (fechaHastaEl) fechaHastaEl.value = '';
+  }
+
+  // Mostrar preview inmediato con los filtros actuales
   actualizarExportPreview();
 
   ['export-fecha-desde','export-fecha-hasta'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.onchange = actualizarExportPreview;
-      el.oninput = actualizarExportPreview;
+      el.oninput  = actualizarExportPreview;
     }
   });
   const elEmpleado = document.getElementById('export-empleado');
@@ -681,7 +714,8 @@ function actualizarExportPreview() {
   const preview  = document.getElementById('export-preview');
   if (!preview) return;
 
-  let ventas = [...STATE.ventas];
+  // Partir de los filtros activos en pantalla
+  let ventas = _filtrarVentasLista();
   if (desde)    ventas = ventas.filter(v => v.fecha && v.fecha.trim() >= desde);
   if (hasta)    ventas = ventas.filter(v => v.fecha && v.fecha.trim() <= hasta);
   if (empleado) ventas = ventas.filter(v => v.registradoPor === empleado);
@@ -697,21 +731,34 @@ function doExportVentas() {
   const hasta    = document.getElementById('export-fecha-hasta')?.value || '';
   const empleado = document.getElementById('export-empleado')?.value   || '';
 
-  const mapaP = {};
-  STATE.pagos.forEach(p => {
-    const key = String(p.ventaId || '').trim();
-    mapaP[key] = (mapaP[key] || 0) + parseFloat(p.monto || 0);
-  });
+  // Partir de la lista ya filtrada por tipo/búsqueda/período activo en pantalla
+  let ventas = _filtrarVentasLista();
 
-  let ventas = [...STATE.ventas];
+  // Aplicar encima los filtros adicionales del modal de exportación
   if (desde)    ventas = ventas.filter(v => v.fecha && v.fecha.trim() >= desde);
   if (hasta)    ventas = ventas.filter(v => v.fecha && v.fecha.trim() <= hasta);
   if (empleado) ventas = ventas.filter(v => v.registradoPor === empleado);
+
+  // Aplicar el mismo orden activo en pantalla
+  ventas = [...ventas].sort((a, b) => {
+    if (_ordenVentas.campo === 'fecha') {
+      const fa = String(a.fecha || '0000-00-00');
+      const fb = String(b.fecha || '0000-00-00');
+      return _ordenVentas.dir === 'desc' ? fb.localeCompare(fa) : fa.localeCompare(fb);
+    }
+    return 0;
+  });
 
   if (!ventas.length) {
     showToast('No hay ventas con esos filtros para exportar', 'warning');
     return;
   }
+
+  const mapaP = {};
+  STATE.pagos.forEach(p => {
+    const key = String(p.ventaId || '').trim();
+    mapaP[key] = (mapaP[key] || 0) + parseFloat(p.monto || 0);
+  });
 
   const rows = [[
     'Cliente','Teléfono','Tipo Lente','Tipo Venta',
@@ -1667,6 +1714,8 @@ function handleTipoVenta() {
   calcularTotal();
 }
 
+let _ordenVentas = { campo: 'fecha', dir: 'desc' };
+
 function renderVentas(lista = STATE.ventas) {
   const tbody = document.getElementById('ventas-body');
   if (!tbody) return;
@@ -1676,14 +1725,30 @@ function renderVentas(lista = STATE.ventas) {
       ${esFiltrando ? 'Sin resultados para esa búsqueda' : 'No hay ventas registradas'}
     </td></tr>`;
     renderPaginacion(lista, 'ventas', 'cambiarPaginaVentas');
+    // Resetear indicadores de orden en headers
+    document.querySelectorAll('#section-ventas .sort-th').forEach(th => {
+      th.querySelector('.sort-icon').textContent = '↕';
+      th.classList.remove('sort-asc','sort-desc');
+    });
     return;
   }
+
+  // Aplicar orden
+  const listaOrdenada = [...lista].sort((a, b) => {
+    if (_ordenVentas.campo === 'fecha') {
+      const fa = String(a.fecha || '0000-00-00');
+      const fb = String(b.fecha || '0000-00-00');
+      return _ordenVentas.dir === 'desc' ? fb.localeCompare(fa) : fa.localeCompare(fb);
+    }
+    return 0;
+  });
+
   const mapaP = {};
   STATE.pagos.forEach(p => {
     const key = String(p.ventaId || '').trim();
     mapaP[key] = (mapaP[key] || 0) + parseFloat(p.monto || 0);
   });
-  const paginados = paginar(lista, 'ventas');
+  const paginados = paginar(listaOrdenada, 'ventas');
   tbody.innerHTML = paginados.map(v => {
     const cliente = STATE.clientes.find(c => String(c.id) === String(v.clienteId));
     const pagado  = mapaP[String(v.id).trim()] || 0;
@@ -1712,8 +1777,33 @@ function renderVentas(lista = STATE.ventas) {
       </tr>
     `;
   }).join('');
-  renderPaginacion(lista, 'ventas', 'cambiarPaginaVentas');
+
+  // Actualizar indicador visual en el th de Fecha
+  document.querySelectorAll('#section-ventas .sort-th').forEach(th => {
+    const icon = th.querySelector('.sort-icon');
+    if (th.dataset.col === 'fecha') {
+      icon.textContent = _ordenVentas.dir === 'desc' ? '↓' : '↑';
+      th.classList.toggle('sort-asc',  _ordenVentas.dir === 'asc');
+      th.classList.toggle('sort-desc', _ordenVentas.dir === 'desc');
+    } else {
+      if (icon) icon.textContent = '↕';
+      th.classList.remove('sort-asc','sort-desc');
+    }
+  });
+
+  renderPaginacion(listaOrdenada, 'ventas', 'cambiarPaginaVentas');
   feather.replace();
+}
+
+function toggleOrdenVentas(campo) {
+  if (_ordenVentas.campo === campo) {
+    _ordenVentas.dir = _ordenVentas.dir === 'desc' ? 'asc' : 'desc';
+  } else {
+    _ordenVentas.campo = campo;
+    _ordenVentas.dir = 'desc';
+  }
+  STATE.paginacion.ventas.pagina = 1;
+  renderVentas(_filtrarVentasLista());
 }
 
 let _periodoVentas = 'todo';
@@ -1762,8 +1852,9 @@ function limpiarFiltroVentasFecha() {
   filterVentas();
 }
 function _filtrarVentasLista() {
-  const q    = val('search-ventas').toLowerCase();
-  const tipo = val('filter-tipo-venta');
+  const q        = val('search-ventas').toLowerCase();
+  const tipo     = val('filter-tipo-venta');
+  const empleado = val('filter-empleado-ventas');
 
   const hoy = new Date();
   hoy.setHours(23, 59, 59, 999);
@@ -1789,9 +1880,10 @@ function _filtrarVentasLista() {
 
   return STATE.ventas.filter(v => {
     const c = STATE.clientes.find(x => x.id == v.clienteId);
-    const matchQ    = (!q || c?.nombre?.toLowerCase().includes(q) || v.tipoLente?.toLowerCase().includes(q));
-    const matchTipo = (!tipo || v.tipo === tipo);
-    let matchFecha  = true;
+    const matchQ       = (!q || c?.nombre?.toLowerCase().includes(q) || v.tipoLente?.toLowerCase().includes(q));
+    const matchTipo    = (!tipo || v.tipo === tipo);
+    const matchEmp     = (!empleado || v.registradoPor === empleado);
+    let matchFecha     = true;
     if (desde || hasta) {
       if (!v.fecha) { matchFecha = false; }
       else {
@@ -1800,7 +1892,7 @@ function _filtrarVentasLista() {
         if (hasta && fv > hasta) matchFecha = false;
       }
     }
-    return matchQ && matchTipo && matchFecha;
+    return matchQ && matchTipo && matchEmp && matchFecha;
   });
 }
 function filterVentas() {
@@ -2574,7 +2666,9 @@ function renderDashboard() {
   actualizarLabelReporte();
 
   // Tabla de adeudos en dashboard
+const empDash = STATE._filtroEmpleadoDash;
   const conSaldo = STATE.ventas
+    .filter(v => !empDash || v.registradoPor === empDash)
     .map(v => ({ ...v, _saldo: parseFloat(v.totalFinal || 0) - calcularPagado(v.id), _c: STATE.clientes.find(c => String(c.id) === String(v.clienteId)) }))
     .filter(v => v._saldo > 0)
     .sort((a, b) => b._saldo - a._saldo)
@@ -2627,7 +2721,6 @@ function calcularKpisPeriodo(periodo, mesCustom) {
   let desde, hasta;
 
   if (mesCustom) {
-    // mesCustom es 'YYYY-MM'
     const [y, m] = mesCustom.split('-').map(Number);
     desde = new Date(y, m - 1, 1);
     hasta = new Date(y, m, 0, 23, 59, 59, 999);
@@ -2644,12 +2737,14 @@ function calcularKpisPeriodo(periodo, mesCustom) {
     desde = new Date(hoy.getFullYear(), 0, 1);
     hasta = new Date(hoy.getFullYear(), 11, 31, 23, 59, 59, 999);
   } else {
-    // total
+    // 'total' — sin filtro de fecha
     desde = null;
     hasta = null;
   }
 
+  const empDash = STATE._filtroEmpleadoDash;
   const ventasFiltradas = STATE.ventas.filter(v => {
+    if (empDash && v.registradoPor !== empDash) return false;
     if (!desde) return true;
     if (!v.fecha) return false;
     const fv = new Date(v.fecha + 'T12:00:00');
@@ -2664,29 +2759,34 @@ function calcularKpisPeriodo(periodo, mesCustom) {
     return s + Math.max(0, parseFloat(v.totalFinal || 0) - pagado);
   }, 0);
 
-  // Label del período
   let labelPeriodo = '';
   if (mesCustom) {
     const [y, m] = mesCustom.split('-').map(Number);
     const d = new Date(y, m - 1, 1);
     labelPeriodo = d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
   } else if (periodo === 'semana') labelPeriodo = 'Esta semana';
-  else if (periodo === 'mes') labelPeriodo = 'Este mes';
-  else if (periodo === 'año') labelPeriodo = String(hoy.getFullYear());
-  else labelPeriodo = 'Histórico';
+  else if (periodo === 'mes')     labelPeriodo = 'Este mes';
+  else if (periodo === 'año')     labelPeriodo = String(hoy.getFullYear());
+  else                            labelPeriodo = 'Histórico';
+
+  if (empDash) labelPeriodo += ' · ' + empDash;
 
   setHTML('kpi-clientes', idsConVenta.size);
   setHTML('kpi-ventas', formatMoney(totalVendido));
   setHTML('kpi-pagados', pagadas);
   setHTML('kpi-pendiente', formatMoney(totalPendiente));
 
-  // Actualizar subtítulos de kpi
   ['kpi-clientes','kpi-ventas','kpi-pagados','kpi-pendiente'].forEach(id => {
     const card = document.getElementById(id)?.closest('.kpi-card');
     if (!card) return;
     const labelEl = card.querySelector('.kpi-label');
     if (!labelEl) return;
-    const base = { 'kpi-clientes': 'Clientes con venta', 'kpi-ventas': 'Total Vendido', 'kpi-pagados': 'Cuentas Pagadas', 'kpi-pendiente': 'Total Pendiente' };
+    const base = {
+      'kpi-clientes': 'Clientes con venta',
+      'kpi-ventas':   'Total Vendido',
+      'kpi-pagados':  'Cuentas Pagadas',
+      'kpi-pendiente':'Total Pendiente'
+    };
     labelEl.textContent = base[id] + (labelPeriodo ? ' · ' + labelPeriodo : '');
   });
 }
@@ -2726,6 +2826,7 @@ function actualizarLabelReporte() {
     };
     label = mapa[STATE._periodoKpi || 'mes'] || 'Este mes';
   }
+  if (STATE._filtroEmpleadoDash) label += ' · ' + STATE._filtroEmpleadoDash;
   span.textContent = '· ' + label;
 }
 async function refreshDashboard() {
@@ -2756,6 +2857,7 @@ async function refreshDashboard() {
     filterAdeudosBusqueda();
     actualizarBadgeAdeudos();
     llenarSelectsClientes();
+    llenarSelectEmpleados();
     filterInventario();
     showToast('Dashboard actualizado', 'success');
   } catch { showToast('Error al actualizar', 'error'); }
@@ -3035,6 +3137,26 @@ function llenarSelectsClientes() {
     }
   });
 }
+function llenarSelectEmpleados() {
+  const esAdmin = ['admin', 'administrador'].includes((STATE.usuario?.rol || '').toLowerCase());
+  if (!esAdmin) return;
+  const empleados = [...new Set(STATE.ventas.map(v => v.registradoPor).filter(Boolean))].sort();
+  const opts = '<option value="">👤 Todos los empleados</option>' +
+    empleados.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+  ['filter-empleado-ventas', 'filter-empleado-dash'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const current = el.value;
+    el.innerHTML = opts;
+    if (current && [...el.options].some(o => o.value === current)) el.value = current;
+  });
+}
+
+function cambiarFiltroEmpleadoDash(empleado) {
+  STATE._filtroEmpleadoDash = empleado || null;
+  renderDashboard();
+  actualizarLabelReporte();
+}
 
 function agregarBuscadorCliente(selectId) {
   const select = document.getElementById(selectId);
@@ -3082,28 +3204,30 @@ const SECTION_LABELS = {
 };
 
 function navigateTo(seccion) {
-  // Desactivar todas las secciones y nav items
+  if (seccion === 'auditoria') {
+    const rol = (STATE.usuario?.rol || '').toLowerCase();
+    if (rol !== 'admin' && rol !== 'administrador') {
+      showToast('Solo administradores pueden ver la auditoría', 'warning');
+      return;
+    }
+  }
+
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-  // Activar la sección seleccionada
   const el = document.getElementById(`section-${seccion}`);
   if (el) el.classList.add('active');
 
-  // Activar nav item
   const navItem = document.querySelector(`.nav-item[data-section="${seccion}"]`);
   if (navItem) navItem.classList.add('active');
 
-  // Breadcrumb
   setHTML('breadcrumb-section', SECTION_LABELS[seccion] || seccion);
 
-  // Re-renderizar secciones que dependen de datos calculados en tiempo real
   if (seccion === 'adeudos')    filterAdeudosBusqueda();
   if (seccion === 'garantias')  filterGarantias();
   if (seccion === 'inventario') filterInventario();
   if (seccion === 'auditoria')  filterAuditoria();
 
-// En móvil, cerrar sidebar y quitar overlay
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
     const overlay = document.getElementById('sidebar-mobile-overlay');
@@ -3514,7 +3638,7 @@ const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]
     .btn-print:hover{opacity:.9;}
 
     /* ── PÁGINA ── */
-    .pagina{background:#fff;max-width:820px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.18);}
+    .pagina{background:#fff;max-width:820px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.18);display:flex;flex-direction:column;min-height:100vh;}
 
     /* ── HEADER PRINCIPAL ── */
     .header{
@@ -3570,7 +3694,7 @@ const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]
     .fecha-val{font-size:15px;font-weight:700;color:#1F3A5F;margin-top:2px;}
 
     /* ── CUERPO ── */
-    .cuerpo{padding:24px 32px;}
+    .cuerpo{padding:24px 32px;flex:1;}
 
     /* ── SECCIONES ── */
     .seccion{margin-bottom:18px;}
@@ -3661,11 +3785,12 @@ const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]
     .divider{height:1px;background:linear-gradient(to right,transparent,#dde6ef,transparent);margin:4px 0 18px;}
 
     /* ── FOOTER ── */
-    .footer{
-      background:linear-gradient(to right,#f4f8fb,#eef4f8);
+.footer{
+      background:linear-gradient(to right,#f0f6fb,#e8f4f8);
       border-top:2px solid #dde9f0;
       padding:20px 32px;
-      display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
+      margin-top:auto;
     }
     .footer-brand{display:flex;align-items:center;gap:10px;}
     .footer-logo{width:32px;height:32px;border-radius:7px;object-fit:contain;background:rgba(31,58,95,.08);padding:3px;}
@@ -3683,6 +3808,7 @@ const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]
     .firma-ced{font-size:9.5px;color:#8A9BB0;margin-top:1px;}
 
     /* ── WATERMARK STRIP ── */
+    .footer-anchor{}
     .wm-strip{
       height:3px;
       background:repeating-linear-gradient(90deg,#4FC3C7 0,#4FC3C7 30px,#2E5C8A 30px,#2E5C8A 60px);
@@ -3690,15 +3816,32 @@ const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]
     }
 
     @media print{
-      body{background:#fff;padding:0;}
-      .pagina{box-shadow:none;border-radius:0;}
+      *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      body{background:#fff;padding:0;margin:0;}
       .btn-print{display:none;}
-      .wm-strip{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-      .header{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-      .rx-box{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-      .seccion-titulo{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-      .av-wrap{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-      table.av th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      .pagina{
+        box-shadow:none;
+        border-radius:0;
+        display:block;
+        min-height:unset;
+        width:100%;
+      }
+      .cuerpo{
+        flex:unset;
+        padding-bottom:0;
+      }
+      .footer{
+        margin-top:0;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      /* Anclar footer al fondo de la última página */
+      .footer-anchor{
+        position:fixed;
+        bottom:0;
+        left:0;
+        right:0;
+      }
     }
   </style>
 </head>
@@ -3864,7 +4007,7 @@ const logoURL  = window.location.origin + window.location.pathname.replace(/[^/]
   </div>
 
   <!-- FOOTER -->
-  <div class="footer">
+  <div class="footer footer-anchor">
     <div class="footer-brand">
       <img src="${logoURL}" alt="" class="footer-logo" onerror="this.style.display='none'" />
       <div class="footer-info">
@@ -5093,7 +5236,10 @@ function generarReportePDF() {
   }
 
   // ── Filtrar ventas del período ──
+const empDash = STATE._filtroEmpleadoDash;
+  const empLabel = empDash ? empDash : '';
   const ventasPeriodo = STATE.ventas.filter(v => {
+    if (empDash && v.registradoPor !== empDash) return false;
     if (!desde) return true;
     if (!v.fecha) return false;
     const fv = new Date(v.fecha + 'T12:00:00');
@@ -5283,11 +5429,11 @@ const isPWA = window.navigator.standalone === true ||
   <div class="rpt-accent"></div>
 
   <!-- PERÍODO ACTIVO -->
-  <div class="rpt-periodo-banner">
+<div class="rpt-periodo-banner">
     <div class="rpt-periodo-icon">${iconoPeriodo}</div>
     <div class="rpt-periodo-texto">
       <div class="rpt-periodo-label">Período del reporte</div>
-      <div class="rpt-periodo-valor">${esc(labelPeriodo)}</div>
+      <div class="rpt-periodo-valor">${esc(labelPeriodo)}${empLabel ? ` <span style="font-size:.85em;opacity:.75;">· ${esc(empLabel)}</span>` : ''}</div>
     </div>
   </div>
 
@@ -5430,8 +5576,7 @@ const isPWA = window.navigator.standalone === true ||
 
   <div class="rpt-footer">
     <div class="rpt-footer-text">Óptica Aurora · Sistema de Gestión Interno · Período: ${esc(labelPeriodo)}</div>
-    <div class="rpt-footer-text">Generado el ${fechaHoy} · ${esc(STATE.usuario?.nombre || '')}</div>
-  </div>
+<div class="rpt-footer-text">Generado el ${fechaHoy} · ${esc(STATE.usuario?.nombre || '')}${empLabel ? ' · Empleado: ' + esc(empLabel) : ''}</div>  </div>
   <div class="wm-strip"></div>
 </div>
 </body></html>`;
